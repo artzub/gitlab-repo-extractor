@@ -1,9 +1,10 @@
 package main
 
 import (
-	"github.com/joho/godotenv"
 	"os"
 	"strconv"
+
+	"github.com/joho/godotenv"
 )
 
 type EnvLoader interface {
@@ -31,10 +32,7 @@ type dotEnvLoader struct{}
 
 // Load loads environment variables from .env files.
 func (d *dotEnvLoader) Load() {
-	err := godotenv.Load(".env.local", ".env")
-	if err != nil {
-		// Handle error if needed, e.g., log it
-	}
+	_ = godotenv.Load(".env.local", ".env")
 }
 
 // Get retrieves the value of the environment variable with the given key.

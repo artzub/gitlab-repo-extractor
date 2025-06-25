@@ -116,5 +116,7 @@ go.work
 go.work.sum
 
 # env file
-.env.*.local
+.env*.local
+
+gl-code-quality-report.json
 
