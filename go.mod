@@ -1,4 +1,4 @@
-module repo-extract
+module github.com/artzub/gitlab-repo-extractor
 
 go 1.24.2
 
