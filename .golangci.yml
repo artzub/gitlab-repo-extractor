@@ -64,6 +64,7 @@ issues:
 formatters:
   enable:
     - gofumpt
+    - goimports
   exclusions:
     generated: lax
     paths:

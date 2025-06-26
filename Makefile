@@ -10,21 +10,20 @@ help: ## Display this help
 
 reviewable: setup fmt lint test ## Run before committing.
 
-fmt: install-gofumpt ## Format code
+fmt: install ## Format code
 	@gofumpt -l -w ./
 
-lint: install-golangci-lint ## Run linter
+lint: install ## Run linter
 	@golangci-lint run
 
 .PHONY: setup
-setup: install-golangci-lint install-gofumpt ## Setup your local environment
+setup: install ## Setup your local environment
 	go mod tidy
 
-install-golangci-lint:
+install:
 	@go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
-
-install-gofumpt:
 	@go install mvdan.cc/gofumpt@latest
+	@go install golang.org/x/tools/cmd/goimports@latest
 
 test: ## Run tests
 	go test ./... -race
