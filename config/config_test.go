@@ -90,7 +90,7 @@ func TestExtractGroupIDs(t *testing.T) {
 	}{
 		{"group1, group2, group3", []string{"group1", "group2", "group3"}},
 		{"group1,   group2,", []string{"group1", "group2"}},
-		{"group1,  group2,  group2,", []string{"group1", "group2"}},
+		{"group1,  group2,  group2,", []string{"group1", "group2"}}, //nolint:dupword
 		{"", []string{}},
 		{", ,, ,", []string{}},
 	}
