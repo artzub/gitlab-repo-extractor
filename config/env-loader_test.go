@@ -5,6 +5,25 @@ import (
 	"testing"
 )
 
+func TestGetInt(t *testing.T) {
+	tests := []struct {
+		value        string
+		defaultValue int
+		expected     int
+	}{
+		{"123", 42, 123},
+		{"", 42, 42},
+		{"notanint", 99, 99},
+	}
+
+	for _, test := range tests {
+		result := getInt(test.value, test.defaultValue)
+		if result != test.expected {
+			t.Errorf("getInt(%q, %d) = %d; want %d", test.value, test.defaultValue, result, test.expected)
+		}
+	}
+}
+
 func TestDefaultEnvLoaderGet(t *testing.T) {
 	tests := []struct {
 		key          string
@@ -121,5 +140,45 @@ func TestDefaultEnvLoaderGetInt(t *testing.T) {
 				t.Errorf("Expected %d, got %d for key %s after setting", test.expected, result, test.key)
 			}
 		})
+	}
+}
+
+func TestMemoryEnvLoader(t *testing.T) {
+	envs := map[string]string{
+		"MEM__STR_KEY": "str_value",
+		"MEM__INT_KEY": "123",
+		"MEM__EMPTY":   "",
+	}
+	loader := NewMemoryEnvLoader(envs)
+
+	// Test Get with existing key
+	if v := loader.Get("MEM__STR_KEY", "default"); v != "str_value" {
+		t.Errorf("Expected str_value, got %s", v)
+	}
+
+	// Test Get with missing key
+	if v := loader.Get("MEM__MISSING", "default"); v != "default" {
+		t.Errorf("Expected default, got %s", v)
+	}
+
+	// Test Get with empty value
+	if v := loader.Get("MEM__EMPTY", "default"); v != "default" {
+		t.Errorf("Expected default, got %s", v)
+	}
+
+	// Test GetInt with valid int
+	if v := loader.GetInt("MEM__INT_KEY", 42); v != 123 {
+		t.Errorf("Expected 123, got %d", v)
+	}
+
+	// Test GetInt with missing key
+	if v := loader.GetInt("MEM__MISSING_INT", 42); v != 42 {
+		t.Errorf("Expected 42, got %d", v)
+	}
+
+	// Test GetInt with invalid int
+	envs["MEM__BAD_INT"] = "notanint"
+	if v := loader.GetInt("MEM__BAD_INT", 99); v != 99 {
+		t.Errorf("Expected 99, got %d", v)
 	}
 }

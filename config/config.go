@@ -29,7 +29,7 @@ func extractGroupIDs(groupIDs string) []string {
 	return slices.Compact(cleaned)
 }
 
-func newConfig(loaders ...EnvLoader) *Config {
+func NewConfig(loaders ...EnvLoader) *Config {
 	var loader EnvLoader
 
 	if len(loaders) > 0 {
@@ -100,7 +100,7 @@ var (
 // GetConfig returns the singleton instance of Config.
 func GetConfig(loaders ...EnvLoader) *Config {
 	configOnce.Do(func() {
-		configInstance = newConfig(loaders...)
+		configInstance = NewConfig(loaders...)
 	})
 	return configInstance
 }

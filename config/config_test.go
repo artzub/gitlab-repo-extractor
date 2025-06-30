@@ -8,36 +8,6 @@ import (
 	"time"
 )
 
-type TestEnvLoader struct {
-	envs map[string]string
-}
-
-func (t *TestEnvLoader) Load() {
-	// No-op for test loader, as we are providing the environment variables directly.
-}
-
-func (t *TestEnvLoader) Get(key string, defaultValue ...string) string {
-	if value, ok := t.envs[key]; ok && value != "" {
-		return value
-	}
-
-	if len(defaultValue) > 0 {
-		return defaultValue[0]
-	}
-	return ""
-}
-
-func (t *TestEnvLoader) GetInt(key string, defaultValue int) int {
-	value := t.Get(key)
-	return getInt(value, defaultValue)
-}
-
-func NewTestEnvLoader(envs map[string]string) *TestEnvLoader {
-	return &TestEnvLoader{
-		envs: envs,
-	}
-}
-
 func TestNewConfig(t *testing.T) {
 	expectConfig := &Config{
 		gitLabURL:    "https://gitlab.example.com",
@@ -62,9 +32,9 @@ func TestNewConfig(t *testing.T) {
 		"RE_USE_SSH":             strconv.FormatBool(expectConfig.useSSH),
 	}
 
-	loader := NewTestEnvLoader(expectations)
+	loader := NewMemoryEnvLoader(expectations)
 
-	config := newConfig(loader)
+	config := NewConfig(loader)
 
 	if config.gitLabURL != expectConfig.gitLabURL {
 		t.Errorf("Expected gitLabURL %s, got %s", expectConfig.gitLabURL, config.gitLabURL)
@@ -99,10 +69,10 @@ func TestGetConfigSingleton(t *testing.T) {
 	expectations := map[string]string{
 		"RE_GITLAB_URL": "https://gitlab.example.com",
 	}
-	loader := NewTestEnvLoader(expectations)
+	loader := NewMemoryEnvLoader(expectations)
 
 	config1 := GetConfig(loader)
-	config2 := GetConfig(loader)
+	config2 := GetConfig()
 
 	if config1 != config2 {
 		t.Error("GetConfig should return the same instance on subsequent calls")

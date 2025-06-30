@@ -54,6 +54,36 @@ func (d *dotEnvLoader) GetInt(key string, defaultValue int) int {
 	return getInt(value, defaultValue)
 }
 
+type MemoryEnvLoader struct {
+	envs map[string]string
+}
+
+func (t *MemoryEnvLoader) Load() {
+	// No-op for test loader, as we are providing the environment variables directly.
+}
+
+func (t *MemoryEnvLoader) Get(key string, defaultValue ...string) string {
+	if value, ok := t.envs[key]; ok && value != "" {
+		return value
+	}
+
+	if len(defaultValue) > 0 {
+		return defaultValue[0]
+	}
+	return ""
+}
+
+func (t *MemoryEnvLoader) GetInt(key string, defaultValue int) int {
+	value := t.Get(key)
+	return getInt(value, defaultValue)
+}
+
+func NewMemoryEnvLoader(envs map[string]string) *MemoryEnvLoader {
+	return &MemoryEnvLoader{
+		envs: envs,
+	}
+}
+
 var DefaultEnvLoader EnvLoader
 
 func init() {
