@@ -15,28 +15,26 @@ type Group struct {
 	fullPath string
 }
 
-func fetchGroups(ctx context.Context, client GroupsService) (<-chan *Group, <-chan error) {
-	cfg := config.GetConfig()
-
+func fetchGroups(ctx context.Context, client GroupsService, cfg *config.Config) (<-chan *Group, <-chan error) {
 	if len(cfg.GetGroupIDs()) > 0 {
-		return fetchGroupsByIDs(ctx, client, cfg.GetGroupIDs())
+		return fetchGroupsByIDs(ctx, client, cfg)
 	}
 
-	return fetchAllGroups(ctx, client)
+	return fetchAllGroups(ctx, client, cfg)
 }
 
-func convertToInt(items []string) *[]int {
-	ints := make([]int, len(items))
+func convertToInt(items []string) []int {
+	ints := make([]int, 0, len(items))
 	for _, item := range items {
 		value, err := strconv.Atoi(item)
-		if err != nil {
+		if err == nil {
 			ints = append(ints, value)
 		}
 	}
-	return &ints
+	return ints
 }
 
-func fetchAllGroups(ctx context.Context, client GroupsService) (<-chan *Group, <-chan error) {
+func fetchAllGroups(ctx context.Context, client GroupsService, cfg *config.Config) (<-chan *Group, <-chan error) {
 	dataChan := make(chan *Group)
 	errsChan := make(chan error)
 
@@ -45,8 +43,6 @@ func fetchAllGroups(ctx context.Context, client GroupsService) (<-chan *Group, <
 			close(dataChan)
 			close(errsChan)
 		}()
-
-		cfg := config.GetConfig()
 
 		wg := &sync.WaitGroup{}
 
@@ -67,8 +63,9 @@ func fetchAllGroups(ctx context.Context, client GroupsService) (<-chan *Group, <
 		}
 
 		topLevelOnly := false
+		skipGroups := convertToInt(cfg.GetSkipGroupIDs())
 		opt := &gitlab.ListGroupsOptions{
-			SkipGroups:   convertToInt(cfg.GetSkipGroupIDs()),
+			SkipGroups:   &skipGroups,
 			TopLevelOnly: &topLevelOnly,
 		}
 		opt.PerPage = 100
@@ -95,7 +92,23 @@ func fetchAllGroups(ctx context.Context, client GroupsService) (<-chan *Group, <
 	return dataChan, errsChan
 }
 
-func fetchGroupsByIDs(ctx context.Context, client GroupsService, groupIDs []string) (<-chan *Group, <-chan error) {
+func filterGroupIDs(groupIDs []string, skipGroupIDs []string) []string {
+	skipGroups := map[string]struct{}{}
+	for _, groupID := range skipGroupIDs {
+		skipGroups[groupID] = struct{}{}
+	}
+
+	var filteredGroupIDs []string
+	for _, groupID := range groupIDs {
+		if _, skip := skipGroups[groupID]; !skip {
+			filteredGroupIDs = append(filteredGroupIDs, groupID)
+		}
+	}
+
+	return filteredGroupIDs
+}
+
+func fetchGroupsByIDs(ctx context.Context, client GroupsService, cfg *config.Config) (<-chan *Group, <-chan error) {
 	dataChan := make(chan *Group)
 	errsChan := make(chan error)
 
@@ -105,27 +118,17 @@ func fetchGroupsByIDs(ctx context.Context, client GroupsService, groupIDs []stri
 			close(errsChan)
 		}()
 
+		groupIDs := cfg.GetGroupIDs()
+
 		if len(groupIDs) == 0 {
-			errsChan <- fmt.Errorf("no group IDs provided")
+			errsChan <- ErrorNoGroupIDs
 			return
 		}
 
-		cfg := config.GetConfig()
-
-		skipGroups := map[string]struct{}{}
-		for _, groupID := range cfg.GetSkipGroupIDs() {
-			skipGroups[groupID] = struct{}{}
-		}
-
-		var filteredGroupIDs []string
-		for _, groupID := range groupIDs {
-			if _, skip := skipGroups[groupID]; !skip {
-				filteredGroupIDs = append(filteredGroupIDs, groupID)
-			}
-		}
+		filteredGroupIDs := filterGroupIDs(groupIDs, cfg.GetSkipGroupIDs())
 
 		if len(filteredGroupIDs) == 0 {
-			errsChan <- fmt.Errorf("all group IDs are skipped")
+			errsChan <- ErrorAllGroupIDsSkipped
 			return
 		}
 
@@ -141,13 +144,9 @@ func fetchGroupsByIDs(ctx context.Context, client GroupsService, groupIDs []stri
 				case <-ctx.Done():
 					return // Exit if context is done
 				case allowed <- struct{}{}: // Acquire a worker slot
-					defer func() {
-						println("Releasing worker slot for group:", groupID)
-						<-allowed
-					}() // Release the worker slot
 				}
 
-				println("process group:", groupID)
+				defer func() { <-allowed }() // Release the worker slot
 
 				group, _, err := client.GetGroup(groupID, &gitlab.GetGroupOptions{}, gitlab.WithContext(ctx))
 				if err != nil {
@@ -161,7 +160,7 @@ func fetchGroupsByIDs(ctx context.Context, client GroupsService, groupIDs []stri
 				if group == nil {
 					select {
 					case <-ctx.Done():
-					case errsChan <- fmt.Errorf("group not found: %v", groupID):
+					case errsChan <- ErrorGroupNotFound(groupID):
 					}
 					return
 				}
@@ -173,7 +172,6 @@ func fetchGroupsByIDs(ctx context.Context, client GroupsService, groupIDs []stri
 
 				select {
 				case <-ctx.Done():
-					return
 				case dataChan <- prepare:
 				}
 			}(groupID)

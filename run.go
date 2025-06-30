@@ -28,7 +28,7 @@ func run() error {
 	fmt.Println("Max retries:", cfg.GetMaxRetries())
 	fmt.Println()
 
-	dataChan, errsChan := fetchGroups(ctx, NewGitlab(client))
+	dataChan, errsChan := fetchGroups(ctx, NewGitlab(client), cfg)
 
 	for dataChan != nil || errsChan != nil {
 		select {
