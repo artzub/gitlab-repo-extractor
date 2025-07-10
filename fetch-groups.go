@@ -44,24 +44,6 @@ func fetchAllGroups(ctx context.Context, client GroupsService, cfg *config.Confi
 			close(errsChan)
 		}()
 
-		wg := &sync.WaitGroup{}
-
-		proceedGroups := func(groups []*gitlab.Group) {
-			defer wg.Done()
-			for _, group := range groups {
-				prepare := &Group{
-					id:       group.ID,
-					fullPath: group.FullPath,
-				}
-
-				select {
-				case <-ctx.Done():
-					return
-				case dataChan <- prepare:
-				}
-			}
-		}
-
 		topLevelOnly := false
 		skipGroups := convertToInt(cfg.GetSkipGroupIDs())
 		opt := &gitlab.ListGroupsOptions{
@@ -77,16 +59,24 @@ func fetchAllGroups(ctx context.Context, client GroupsService, cfg *config.Confi
 				return
 			}
 
-			wg.Add(1)
-			go proceedGroups(groups)
+			for _, group := range groups {
+				prepare := &Group{
+					id:       group.ID,
+					fullPath: group.FullPath,
+				}
+
+				select {
+				case <-ctx.Done():
+					return
+				case dataChan <- prepare:
+				}
+			}
 
 			if resp.NextPage == 0 {
 				break
 			}
 			opt.Page = resp.NextPage
 		}
-
-		wg.Wait()
 	}()
 
 	return dataChan, errsChan
@@ -132,7 +122,7 @@ func fetchGroupsByIDs(ctx context.Context, client GroupsService, cfg *config.Con
 			return
 		}
 
-		allowed := make(chan struct{}, cfg.GetMaxWorkers())
+		semaphore := make(chan struct{}, cfg.GetMaxWorkers())
 		wg := &sync.WaitGroup{}
 
 		for _, groupID := range filteredGroupIDs {
@@ -143,10 +133,10 @@ func fetchGroupsByIDs(ctx context.Context, client GroupsService, cfg *config.Con
 				select {
 				case <-ctx.Done():
 					return // Exit if context is done
-				case allowed <- struct{}{}: // Acquire a worker slot
+				case semaphore <- struct{}{}: // Acquire a worker slot
 				}
 
-				defer func() { <-allowed }() // Release the worker slot
+				defer func() { <-semaphore }() // Release the worker slot
 
 				group, _, err := client.GetGroup(groupID, &gitlab.GetGroupOptions{}, gitlab.WithContext(ctx))
 				if err != nil {

@@ -7,6 +7,10 @@ type GroupsService interface {
 	ListGroups(opt *gitlab.ListGroupsOptions, options ...gitlab.RequestOptionFunc) ([]*gitlab.Group, *gitlab.Response, error)
 }
 
+type ProjectsService interface {
+	ListGroupProjects(gid int, opt *gitlab.ListGroupProjectsOptions, options ...gitlab.RequestOptionFunc) ([]*gitlab.Project, *gitlab.Response, error)
+}
+
 type Gitlab struct {
 	client *gitlab.Client
 }
@@ -23,4 +27,8 @@ func (g *Gitlab) GetGroup(gid string, opt *gitlab.GetGroupOptions, options ...gi
 
 func (g *Gitlab) ListGroups(opt *gitlab.ListGroupsOptions, options ...gitlab.RequestOptionFunc) ([]*gitlab.Group, *gitlab.Response, error) {
 	return g.client.Groups.ListGroups(opt, options...)
+}
+
+func (g *Gitlab) ListGroupProjects(gid int, opt *gitlab.ListGroupProjectsOptions, options ...gitlab.RequestOptionFunc) ([]*gitlab.Project, *gitlab.Response, error) {
+	return g.client.Groups.ListGroupProjects(gid, opt, options...)
 }

@@ -352,11 +352,9 @@ func TestFetchGroupsByIDs(t *testing.T) {
 }
 
 func TestFetchAllGroups(t *testing.T) {
+	// TODO add tests for fetchAllGroups function.
 }
 
 func TestFetchGroups(t *testing.T) {
-	// This function is a placeholder for the test implementation.
-	// It should contain the logic to test the fetchGroups function.
-	// You can use a testing framework like "testing" in Go to implement this.
-	// For example, you can create mock clients and verify that groups are fetched correctly.
+	// TODO add tests for fetchGroups function.
 }
