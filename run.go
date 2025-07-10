@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/artzub/gitlab-repo-extractor/config"
@@ -14,9 +15,9 @@ func run() error {
 
 	cfg := config.GetConfig()
 
-	client, err := gitlab.NewClient(cfg.GetAccessToken(), gitlab.WithBaseURL(cfg.GetGitLabURL()))
-	if err != nil {
-		return fmt.Errorf("failed to create GitLab client: %w", err)
+	client, errClient := gitlab.NewClient(cfg.GetAccessToken(), gitlab.WithBaseURL(cfg.GetGitLabURL()))
+	if errClient != nil {
+		return fmt.Errorf("failed to create GitLab client: %w", errClient)
 	}
 
 	fmt.Println("Connected to GitLab:", cfg.GetGitLabURL())
@@ -28,28 +29,32 @@ func run() error {
 	fmt.Println("Max retries:", cfg.GetMaxRetries())
 	fmt.Println()
 
-	dataChan, errsChan := fetchGroups(ctx, NewGitlab(client), cfg)
+	gitlabClient := NewGitlab(client)
 
-	for dataChan != nil || errsChan != nil {
+	groupsChan, groupErrsChan := fetchGroups(ctx, gitlabClient, cfg)
+	projectsChan, projectErrsChan := proceedGroups(ctx, gitlabClient, groupsChan)
+
+	errGroup := mergeChans(ctx, groupErrsChan, projectErrsChan)
+
+	for projectsChan != nil || errGroup != nil {
 		select {
-		case group, ok := <-dataChan:
+		case project, ok := <-projectsChan:
 			if !ok {
-				dataChan = nil
+				projectsChan = nil
 				continue
 			}
-			if group == nil {
+			if project == nil {
 				continue
 			}
 
-			fmt.Printf("Fetched group: %s (ID: %d)\n", group.fullPath, group.id)
-
-		case err, ok := <-errsChan:
+			fmt.Printf("Fetched project: %v\n", project)
+		case err, ok := <-errGroup:
 			if !ok {
-				errsChan = nil
+				errGroup = nil
 				continue
 			}
 			if err != nil {
-				printError(err)
+				log.Println(err)
 			}
 		case <-ctx.Done():
 			break
