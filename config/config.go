@@ -43,15 +43,15 @@ func NewConfig(loaders ...EnvLoader) *Config {
 	loader.Load()
 
 	return &Config{
-		gitLabURL:    loader.Get("RE_GITLAB_URL", "https://gitlab.com"),
-		accessToken:  loader.Get("RE_GITLAB_TOKEN"),
-		outputDir:    loader.Get("RE_OUTPUT_DIR", "./gitlab-repos"),
-		useSSH:       loader.Get("RE_USE_SSH", "false") == "true",
-		groupIDs:     extractGroupIDs(loader.Get("RE_GROUP_IDS")),
-		skipGroupIDs: extractGroupIDs(loader.Get("RE_SKIP_GROUP_IDS")),
-		maxWorkers:   loader.GetInt("RE_MAX_WORKERS", 5),
-		maxRetries:   loader.GetInt("RE_MAX_RETRIES", 3),
-		retryDelay:   time.Duration(loader.GetInt("RE_RETRY_DELAY_SECONDS", 2)) * time.Second,
+		gitLabURL:    loader.Get(GitlabURLKey, DefaultGitlabURL),
+		accessToken:  loader.Get(GitlabTokenKey),
+		outputDir:    loader.Get(OutputDirKey, DefaultOutputDir),
+		useSSH:       loader.Get(UseSSHKey, DefaultUseSSH) == "true",
+		groupIDs:     extractGroupIDs(loader.Get(GroupIDsKey)),
+		skipGroupIDs: extractGroupIDs(loader.Get(SkipGroupIDsKey)),
+		maxWorkers:   loader.GetInt(MaxWorkersKey, DefaultMaxWorkers),
+		maxRetries:   loader.GetInt(MaxRetriesKey, DefaultMaxRetries),
+		retryDelay:   time.Duration(loader.GetInt(RetryDelayKey, DefaultRetryDelay)) * time.Second,
 	}
 }
 

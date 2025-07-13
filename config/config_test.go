@@ -21,15 +21,15 @@ func TestNewConfig(t *testing.T) {
 		useSSH:       true,
 	}
 	expectations := map[string]string{
-		"RE_GITLAB_URL":          expectConfig.gitLabURL,
-		"RE_GITLAB_TOKEN":        expectConfig.accessToken,
-		"RE_OUTPUT_DIR":          expectConfig.outputDir,
-		"RE_GROUP_IDS":           strings.Join(expectConfig.groupIDs, " "),
-		"RE_SKIP_GROUP_IDS":      strings.Join(expectConfig.skipGroupIDs, ","),
-		"RE_RETRY_DELAY_SECONDS": strconv.Itoa(int(expectConfig.retryDelay.Seconds())),
-		"RE_MAX_WORKERS":         strconv.Itoa(expectConfig.maxWorkers),
-		"RE_MAX_RETRIES":         strconv.Itoa(expectConfig.maxRetries),
-		"RE_USE_SSH":             strconv.FormatBool(expectConfig.useSSH),
+		GitlabURLKey:    expectConfig.gitLabURL,
+		GitlabTokenKey:  expectConfig.accessToken,
+		OutputDirKey:    expectConfig.outputDir,
+		GroupIDsKey:     strings.Join(expectConfig.groupIDs, " "),
+		SkipGroupIDsKey: strings.Join(expectConfig.skipGroupIDs, ","),
+		RetryDelayKey:   strconv.Itoa(int(expectConfig.retryDelay.Seconds())),
+		MaxWorkersKey:   strconv.Itoa(expectConfig.maxWorkers),
+		MaxRetriesKey:   strconv.Itoa(expectConfig.maxRetries),
+		UseSSHKey:       strconv.FormatBool(expectConfig.useSSH),
 	}
 
 	loader := NewMemoryEnvLoader(expectations)
