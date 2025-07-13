@@ -2,8 +2,7 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"strconv"
+	"errors"
 	"sync"
 
 	"github.com/artzub/gitlab-repo-extractor/config"
@@ -23,17 +22,6 @@ func fetchGroups(ctx context.Context, client GroupsService, cfg *config.Config) 
 	return fetchAllGroups(ctx, client, cfg)
 }
 
-func convertToInt(items []string) []int {
-	ints := make([]int, 0, len(items))
-	for _, item := range items {
-		value, err := strconv.Atoi(item)
-		if err == nil {
-			ints = append(ints, value)
-		}
-	}
-	return ints
-}
-
 func fetchAllGroups(ctx context.Context, client GroupsService, cfg *config.Config) (<-chan *Group, <-chan error) {
 	dataChan := make(chan *Group)
 	errsChan := make(chan error)
@@ -44,8 +32,28 @@ func fetchAllGroups(ctx context.Context, client GroupsService, cfg *config.Confi
 			close(errsChan)
 		}()
 
+		var skipGroups []int
+
+		if len(cfg.GetSkipGroupIDs()) > 0 {
+			for _, skipGroupID := range cfg.GetSkipGroupIDs() {
+				var fetchErr *ErrorGroupFetching
+				group, err := fetchGroupByID(ctx, client, skipGroupID)
+				isNotFound := errors.As(err, &fetchErr) && fetchErr.IsGroupNotFound()
+				if err != nil && !isNotFound {
+					select {
+					case <-ctx.Done():
+					case errsChan <- err:
+					}
+					return
+				}
+
+				if !isNotFound {
+					skipGroups = append(skipGroups, group.id)
+				}
+			}
+		}
+
 		topLevelOnly := false
-		skipGroups := convertToInt(cfg.GetSkipGroupIDs())
 		opt := &gitlab.ListGroupsOptions{
 			SkipGroups:   &skipGroups,
 			TopLevelOnly: &topLevelOnly,
@@ -55,11 +63,15 @@ func fetchAllGroups(ctx context.Context, client GroupsService, cfg *config.Confi
 		for {
 			groups, resp, err := client.ListGroups(opt, gitlab.WithContext(ctx))
 			if err != nil {
-				errsChan <- fmt.Errorf("failed to fetch groups: %w", err)
+				errsChan <- &ErrorGroupsFetching{err}
 				return
 			}
 
 			for _, group := range groups {
+				if group == nil {
+					continue
+				}
+
 				prepare := &Group{
 					id:       group.ID,
 					fullPath: group.FullPath,
@@ -138,7 +150,7 @@ func fetchGroupsByIDs(ctx context.Context, client GroupsService, cfg *config.Con
 
 				defer func() { <-semaphore }() // Release the worker slot
 
-				group, _, err := client.GetGroup(groupID, &gitlab.GetGroupOptions{}, gitlab.WithContext(ctx))
+				group, err := fetchGroupByID(ctx, client, groupID)
 				if err != nil {
 					select {
 					case <-ctx.Done():
@@ -147,22 +159,9 @@ func fetchGroupsByIDs(ctx context.Context, client GroupsService, cfg *config.Con
 					return
 				}
 
-				if group == nil {
-					select {
-					case <-ctx.Done():
-					case errsChan <- ErrorGroupNotFound(groupID):
-					}
-					return
-				}
-
-				prepare := &Group{
-					id:       group.ID,
-					fullPath: group.FullPath,
-				}
-
 				select {
 				case <-ctx.Done():
-				case dataChan <- prepare:
+				case dataChan <- group:
 				}
 			}(groupID)
 		}
@@ -171,4 +170,20 @@ func fetchGroupsByIDs(ctx context.Context, client GroupsService, cfg *config.Con
 	}()
 
 	return dataChan, errsChan
+}
+
+func fetchGroupByID(ctx context.Context, client GroupsService, groupID string) (*Group, error) {
+	group, _, err := client.GetGroup(groupID, &gitlab.GetGroupOptions{}, gitlab.WithContext(ctx))
+	if err != nil {
+		return nil, &ErrorGroupFetching{groupID, err}
+	}
+
+	if group == nil {
+		return nil, &ErrorGroupFetching{groupID, ErrorNoGroupPassed}
+	}
+
+	return &Group{
+		id:       group.ID,
+		fullPath: group.FullPath,
+	}, nil
 }
