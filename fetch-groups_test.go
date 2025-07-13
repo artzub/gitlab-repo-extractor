@@ -128,8 +128,8 @@ func TestFetchGroupsByIDs(t *testing.T) {
 			name: "should fetch groups by IDs",
 			fn: func(t *testing.T) (<-chan *Group, <-chan error) {
 				cfg := config.NewConfig(config.NewMemoryEnvLoader(map[string]string{
-					"RE_GROUP_IDS":      "example_group1, example_group5, example_group2",
-					"RE_SKIP_GROUP_IDS": "example_group2",
+					config.GroupIDsKey:     "example_group1, example_group5, example_group2",
+					config.SkipGroupIDsKey: "example_group2",
 				}))
 
 				gitlabGroups := getGitlabGroups()
@@ -171,7 +171,7 @@ func TestFetchGroupsByIDs(t *testing.T) {
 			name: "should return error if no group IDs provided",
 			fn: func(t *testing.T) (<-chan *Group, <-chan error) {
 				cfg := config.NewConfig(config.NewMemoryEnvLoader(map[string]string{
-					"RE_GROUP_IDS": "",
+					config.GroupIDsKey: "",
 				}))
 
 				gitlabGroups := getGitlabGroups()
@@ -198,8 +198,8 @@ func TestFetchGroupsByIDs(t *testing.T) {
 			name: "should return error if all group IDs are skipped",
 			fn: func(t *testing.T) (<-chan *Group, <-chan error) {
 				cfg := config.NewConfig(config.NewMemoryEnvLoader(map[string]string{
-					"RE_GROUP_IDS":      "example_group1, example_group2",
-					"RE_SKIP_GROUP_IDS": "example_group1, example_group2",
+					config.GroupIDsKey:     "example_group1, example_group2",
+					config.SkipGroupIDsKey: "example_group1, example_group2",
 				}))
 
 				gitlabGroups := getGitlabGroups()
@@ -226,7 +226,7 @@ func TestFetchGroupsByIDs(t *testing.T) {
 			name: "should handle context cancellation",
 			fn: func(t *testing.T) (<-chan *Group, <-chan error) {
 				cfg := config.NewConfig(config.NewMemoryEnvLoader(map[string]string{
-					"RE_GROUP_IDS": "example_group1, example_group2",
+					config.GroupIDsKey: "example_group1, example_group2",
 				}))
 
 				gitlabGroups := getGitlabGroups()
@@ -270,7 +270,7 @@ func TestFetchGroupsByIDs(t *testing.T) {
 			name: "should error if group not found",
 			fn: func(t *testing.T) (<-chan *Group, <-chan error) {
 				cfg := config.NewConfig(config.NewMemoryEnvLoader(map[string]string{
-					"RE_GROUP_IDS": "non_existent_group",
+					config.GroupIDsKey: "non_existent_group",
 				}))
 
 				gitlabGroups := getGitlabGroups()
@@ -297,7 +297,7 @@ func TestFetchGroupsByIDs(t *testing.T) {
 			name: "should error if a group is nil",
 			fn: func(t *testing.T) (<-chan *Group, <-chan error) {
 				cfg := config.NewConfig(config.NewMemoryEnvLoader(map[string]string{
-					"RE_GROUP_IDS": "example_group1",
+					config.GroupIDsKey: "example_group1",
 				}))
 				expectedErr := ErrorGroupNotFound("example_group1")
 
