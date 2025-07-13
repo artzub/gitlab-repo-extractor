@@ -82,9 +82,10 @@ func (e *ErrorFailedToCloneProject) Error() string {
 }
 
 var (
-	ErrorNoGroupIDs         = errors.New("no group IDs provided")
-	ErrorAllGroupIDsSkipped = errors.New("all group IDs are skipped")
-	ErrorNoGroupPassed      = errors.New("no group passed")
-	ErrorNoConfigPassed     = errors.New("no configuration passed")
-	ErrorNoProjectsPassed   = errors.New("no projects passed")
+	ErrorNoGroupIDs          = errors.New("no group IDs provided")
+	ErrorAllGroupIDsSkipped  = errors.New("all group IDs are skipped")
+	ErrorNoGroupPassed       = errors.New("no group passed")
+	ErrorNoConfigPassed      = errors.New("no configuration passed")
+	ErrorNoProjectsPassed    = errors.New("no projects passed")
+	ErrorPathExistsButNotDir = errors.New("path exists but is not a directory")
 )

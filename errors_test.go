@@ -93,4 +93,7 @@ func TestErrorVars(t *testing.T) {
 	if ErrorNoProjectsPassed.Error() != "no projects passed" {
 		t.Error("ErrorNoProjectsPassed string mismatch")
 	}
+	if ErrorPathExistsButNotDir.Error() != "path exists but is not a directory" {
+		t.Error("ErrorPathExistsButNotDir string mismatch")
+	}
 }

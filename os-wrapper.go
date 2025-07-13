@@ -17,18 +17,17 @@ type DefaultOSWrapper struct{}
 
 func (w *DefaultOSWrapper) MakeDirAll(path string) (bool, error) {
 	err := os.MkdirAll(path, 0o755)
-
-	if err != nil && os.IsExist(err) {
-		return true, nil
-	}
-
 	return err == nil, err
 }
 
 func (w *DefaultOSWrapper) IsDirExists(path string) (bool, error) {
-	_, err := os.Stat(path)
+	stat, err := os.Stat(path)
 	if err == nil {
-		return true, nil
+		if stat.IsDir() {
+			return true, nil
+		}
+
+		return false, ErrorPathExistsButNotDir
 	}
 
 	if os.IsNotExist(err) {
