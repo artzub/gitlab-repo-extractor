@@ -16,7 +16,7 @@ type OSWrapper interface {
 type DefaultOSWrapper struct{}
 
 func (w *DefaultOSWrapper) MakeDirAll(path string) (bool, error) {
-	err := os.MkdirAll(path, 0755) //nolint:gofumpt
+	err := os.MkdirAll(path, 0o755)
 
 	if err != nil && os.IsExist(err) {
 		return true, nil
