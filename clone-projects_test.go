@@ -22,14 +22,17 @@ type mockOSWrapper struct {
 func (m *mockOSWrapper) IsDirExists(path string) (bool, error) {
 	return m.isDirExists, m.isDirErr
 }
+
 func (m *mockOSWrapper) ExecuteCommand(ctx context.Context, name string, args ...string) ([]byte, error) {
 	m.cmdArgs = append([]string{name}, args...)
 	return m.cmdOutput, m.cmdErr
 }
+
 func (m *mockOSWrapper) RemoveAll(path string) error {
 	m.removedDir = path
 	return m.removeErr
 }
+
 func (m *mockOSWrapper) MakeDirAll(path string) (bool, error) {
 	return true, nil
 }
@@ -68,6 +71,37 @@ func TestAddTokenToHTTPSURL(t *testing.T) {
 				t.Errorf("expected %s, got %s", testCase.expected, result)
 			}
 		})
+	}
+}
+
+func TestGitCloner_NewGitCloner(t *testing.T) {
+	osWrapper := &mockOSWrapper{}
+	cloner := NewGitCloner(osWrapper)
+
+	if cloner == nil {
+		t.Fatal("expected non-nil GitCloner")
+	}
+
+	if cloner.osWrapper != osWrapper {
+		t.Errorf("expected osWrapper to be %v, got %v", osWrapper, cloner.osWrapper)
+	}
+
+	aOSWrapper := GetDefaultOSWrapper()
+	if aOSWrapper == nil {
+		t.Fatal("expected non-nil default OS wrapper")
+	}
+
+	clonerDefault := NewGitCloner()
+	if clonerDefault == nil {
+		t.Fatal("expected non-nil GitCloner with default OS wrapper")
+	}
+
+	if clonerDefault.GetOSWrapper() != aOSWrapper {
+		t.Errorf("expected default OS wrapper to be %v, got %v", aOSWrapper, clonerDefault.GetOSWrapper())
+	}
+
+	if clonerDefault.GetOSWrapper() == cloner.GetOSWrapper() {
+		t.Error("expected different OS wrappers for default and custom GitCloner")
 	}
 }
 
@@ -115,7 +149,7 @@ func TestGitCloner_cloneProject(t *testing.T) {
 				isDirErr: errors.New("failed"),
 			},
 			cfg: emptyCfg,
-			expectedError: &ErrorFailedToCheckDirExists{
+			expectedError: &ErrorDirExistsCheck{
 				project.pathWithNamespace,
 				errors.New("failed"),
 			},
@@ -162,7 +196,7 @@ func TestGitCloner_cloneProject(t *testing.T) {
 						return
 					}
 
-					var dirExistsErr *ErrorFailedToCheckDirExists
+					var dirExistsErr *ErrorDirExistsCheck
 					if errors.As(testCase.expectedError, &dirExistsErr) &&
 						errors.As(err, &dirExistsErr) &&
 						testCase.expectedError.Error() == err.Error() {
@@ -247,7 +281,8 @@ func TestGitCloner_CloneProjectWithRetry(t *testing.T) {
 					project.pathWithNamespace,
 					errors.New("failed to execute command"),
 					nil,
-				}},
+				},
+			},
 		},
 		{
 			name:      "Clone project success",

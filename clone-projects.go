@@ -95,7 +95,7 @@ func (c *GitCloner) cloneProject(ctx context.Context, cfg *config.Config, projec
 	ok, err := c.osWrapper.IsDirExists(projectDir)
 	if ok || err != nil {
 		if err != nil {
-			return &ErrorFailedToCheckDirExists{projectDir, err}
+			return &ErrorDirExistsCheck{projectDir, err}
 		}
 
 		return ErrorDirExists(projectDir)
