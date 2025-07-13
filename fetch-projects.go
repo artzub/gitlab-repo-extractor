@@ -3,14 +3,17 @@ package main
 import (
 	"context"
 	"fmt"
+
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
 
 type Project struct {
-	id            int
-	sshURLToRepo  string
-	httpURLToRepo string
-	group         *Group
+	id                int
+	sshURLToRepo      string
+	httpURLToRepo     string
+	path              string
+	pathWithNamespace string
+	group             *Group
 }
 
 func fetchProjectByGroup(ctx context.Context, client ProjectsService, group *Group) (<-chan *Project, <-chan error) {
@@ -53,10 +56,12 @@ func fetchProjectByGroup(ctx context.Context, client ProjectsService, group *Gro
 
 			for _, project := range projects {
 				prepare := &Project{
-					id:            project.ID,
-					sshURLToRepo:  project.SSHURLToRepo,
-					httpURLToRepo: project.HTTPURLToRepo,
-					group:         group,
+					id:                project.ID,
+					path:              project.Path,
+					pathWithNamespace: project.PathWithNamespace,
+					sshURLToRepo:      project.SSHURLToRepo,
+					httpURLToRepo:     project.HTTPURLToRepo,
+					group:             group,
 				}
 
 				select {

@@ -20,45 +20,67 @@ func run() error {
 		return fmt.Errorf("failed to create GitLab client: %w", errClient)
 	}
 
-	fmt.Println("Connected to GitLab:", cfg.GetGitLabURL())
-	fmt.Println("Output directory:", cfg.GetOutputDir())
-	fmt.Println("Group IDs:", strings.Join(cfg.GetGroupIDs(), ","))
-	fmt.Println("Skip Group IDs:", strings.Join(cfg.GetSkipGroupIDs(), ","))
-	fmt.Println("Using SSH:", cfg.GetUseSSH())
-	fmt.Println("Max workers:", cfg.GetMaxWorkers())
-	fmt.Println("Max retries:", cfg.GetMaxRetries())
-	fmt.Println()
+	log.Println("Connected to GitLab:", cfg.GetGitLabURL())
+	log.Println("Output directory:", cfg.GetOutputDir())
+	log.Println("Group IDs:", strings.Join(cfg.GetGroupIDs(), ","))
+	log.Println("Skip Group IDs:", strings.Join(cfg.GetSkipGroupIDs(), ","))
+	log.Println("Using SSH:", cfg.GetUseSSH())
+	log.Println("Max workers:", cfg.GetMaxWorkers())
+	log.Println("Max retries:", cfg.GetMaxRetries())
+	log.Println()
 
 	gitlabClient := NewGitlab(client)
 
 	groupsChan, groupErrsChan := fetchGroups(ctx, gitlabClient, cfg)
 	projectsChan, projectErrsChan := proceedGroups(ctx, gitlabClient, groupsChan)
+	resultsChan := proceedProjects(ctx, NewGitCloner(), projectsChan)
 
 	errGroup := mergeChans(ctx, groupErrsChan, projectErrsChan)
 
-	for projectsChan != nil || errGroup != nil {
+	counter := NewProgressCounter(0)
+	errorsCounter := NewProgressCounter(0)
+
+	for resultsChan != nil || errGroup != nil {
 		select {
-		case project, ok := <-projectsChan:
+		case result, ok := <-resultsChan:
 			if !ok {
-				projectsChan = nil
+				resultsChan = nil
 				continue
 			}
-			if project == nil {
+			if result == nil {
 				continue
 			}
 
-			fmt.Printf("Fetched project: %v\n", project)
+			if result.err != nil {
+				counter.Update(false)
+				log.Printf("Error processing project: %v\n", result.err)
+				continue
+			}
+
+			counter.Update(true)
 		case err, ok := <-errGroup:
 			if !ok {
 				errGroup = nil
 				continue
 			}
 			if err != nil {
+				errorsCounter.Update(false)
 				log.Println(err)
 			}
 		case <-ctx.Done():
 			break
 		}
+	}
+
+	log.Println("Processing completed.")
+	_, completed, success, errors := counter.GetStats()
+	log.Println("Total projects processed:", completed)
+	log.Println("Successful:", success)
+	log.Println("Errors:", errors)
+
+	fetchErrors := errorsCounter.GetErrors()
+	if fetchErrors > 0 {
+		log.Println("Errors occurred while fetching groups or projects:", fetchErrors)
 	}
 
 	return nil

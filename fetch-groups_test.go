@@ -34,7 +34,7 @@ func NewFakeGitlab(groups map[string]*gitlab.Group, sleeps ...time.Duration) *Fa
 	}
 }
 
-func (f *FakeGitlab) GetGroup(gid string, opt *gitlab.GetGroupOptions, options ...gitlab.RequestOptionFunc) (*gitlab.Group, *gitlab.Response, error) {
+func (f *FakeGitlab) GetGroup(gid string, _ *gitlab.GetGroupOptions, _ ...gitlab.RequestOptionFunc) (*gitlab.Group, *gitlab.Response, error) {
 	if f.sleep > 0 {
 		time.Sleep(f.sleep)
 	}
@@ -49,7 +49,7 @@ func (f *FakeGitlab) GetGroup(gid string, opt *gitlab.GetGroupOptions, options .
 	return nil, nil, fmt.Errorf("group %s: not found %d", gid, 404)
 }
 
-func (f *FakeGitlab) ListGroups(opt *gitlab.ListGroupsOptions, options ...gitlab.RequestOptionFunc) ([]*gitlab.Group, *gitlab.Response, error) {
+func (f *FakeGitlab) ListGroups(opt *gitlab.ListGroupsOptions, _ ...gitlab.RequestOptionFunc) ([]*gitlab.Group, *gitlab.Response, error) {
 	if f.sleep > 0 {
 		time.Sleep(f.sleep)
 	}
@@ -186,7 +186,6 @@ func TestFetchGroupByID(t *testing.T) {
 
 			ctx := context.Background()
 			group, err := fetchGroupByID(ctx, client, test.groupID)
-
 			if err != nil {
 				var fetchErr *ErrorGroupFetching
 				if errors.As(err, &fetchErr) && err.Error() == test.expectedErr.Error() {
