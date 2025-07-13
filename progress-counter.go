@@ -40,3 +40,10 @@ func (c *ProgressCounter) GetStats() (uint32, uint32, uint32, uint32) {
 		c.success,
 		c.failed
 }
+
+func (c *ProgressCounter) GetErrors() uint32 {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	return c.failed
+}

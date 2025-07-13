@@ -32,4 +32,9 @@ func TestProgressCounter(t *testing.T) {
 		failed != halfTotal {
 		t.Fatalf("Test failed: stats do not match expected values")
 	}
+
+	errors := counter.GetErrors()
+	if errors != halfTotal {
+		t.Fatalf("Test failed: expected %d errors, got %d", halfTotal, errors)
+	}
 }
