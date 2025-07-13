@@ -36,6 +36,70 @@ func TestNewConfig(t *testing.T) {
 
 	config := NewConfig(loader)
 
+	// Verify the configuration values
+	if config.gitLabURL != expectConfig.gitLabURL {
+		t.Errorf("Expected gitLabURL %s, got %s", expectConfig.gitLabURL, config.gitLabURL)
+	}
+	if config.accessToken != expectConfig.accessToken {
+		t.Errorf("Expected accessToken %s, got %s", expectConfig.accessToken, config.accessToken)
+	}
+	if config.outputDir != expectConfig.outputDir {
+		t.Errorf("Expected outputDir %s, got %s", expectConfig.outputDir, config.outputDir)
+	}
+	if !slices.Equal(config.groupIDs, expectConfig.groupIDs) {
+		t.Errorf("Expected GroupIDs %s, got %s", expectConfig.groupIDs, config.groupIDs)
+	}
+	if !slices.Equal(config.skipGroupIDs, expectConfig.skipGroupIDs) {
+		t.Errorf("Expected skipGroupIDs %s, got %s", expectConfig.skipGroupIDs, config.skipGroupIDs)
+	}
+	if config.retryDelay != expectConfig.retryDelay {
+		t.Errorf("Expected retryDelay %s, got %s", expectConfig.retryDelay, config.retryDelay)
+	}
+	if config.maxWorkers != expectConfig.maxWorkers {
+		t.Errorf("Expected maxWorkers %d, got %d", expectConfig.maxWorkers, config.maxWorkers)
+	}
+	if config.maxRetries != expectConfig.maxRetries {
+		t.Errorf("Expected maxRetries %d, got %d", expectConfig.maxRetries, config.maxRetries)
+	}
+	if config.useSSH != expectConfig.useSSH {
+		t.Errorf("Expected useSSH %t, got %t", expectConfig.useSSH, config.useSSH)
+	}
+
+	// Verify getters
+	if config.GetGitLabURL() != config.gitLabURL {
+		t.Errorf("Expected gitLabURL %s, got %s", config.gitLabURL, config.GetGitLabURL())
+	}
+	if config.GetAccessToken() != config.accessToken {
+		t.Errorf("Expected accessToken %s, got %s", config.accessToken, config.GetAccessToken())
+	}
+	if config.GetOutputDir() != config.outputDir {
+		t.Errorf("Expected outputDir %s, got %s", config.outputDir, config.GetOutputDir())
+	}
+	if !slices.Equal(config.GetGroupIDs(), config.groupIDs) {
+		t.Errorf("Expected GroupIDs %s, got %s", config.groupIDs, config.GetGroupIDs())
+	}
+	if !slices.Equal(config.GetSkipGroupIDs(), config.skipGroupIDs) {
+		t.Errorf("Expected skipGroupIDs %s, got %s", config.skipGroupIDs, config.GetSkipGroupIDs())
+	}
+	if config.GetRetryDelay() != config.retryDelay {
+		t.Errorf("Expected retryDelay %s, got %s", config.retryDelay, config.GetRetryDelay())
+	}
+	if config.GetMaxWorkers() != config.maxWorkers {
+		t.Errorf("Expected maxWorkers %d, got %d", config.maxWorkers, config.GetMaxWorkers())
+	}
+	if config.GetMaxRetries() != config.maxRetries {
+		t.Errorf("Expected maxRetries %d, got %d", config.maxRetries, config.GetMaxRetries())
+	}
+	if config.GetUseSSH() != config.useSSH {
+		t.Errorf("Expected useSSH %t, got %t", config.useSSH, config.GetUseSSH())
+	}
+
+	beforeDefaultLoader := DefaultEnvLoader
+	defer func() {
+		DefaultEnvLoader = beforeDefaultLoader
+	}()
+	DefaultEnvLoader = loader
+	config = NewConfig()
 	if config.gitLabURL != expectConfig.gitLabURL {
 		t.Errorf("Expected gitLabURL %s, got %s", expectConfig.gitLabURL, config.gitLabURL)
 	}
