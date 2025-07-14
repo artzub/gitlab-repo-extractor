@@ -18,63 +18,63 @@ func proceedGroups(ctx context.Context, client ProjectsService, groupsChan <-cha
 		}()
 
 		cfg := config.GetConfig()
+		maxWorkers := cfg.GetMaxWorkers()
 
-		semaphore := make(chan struct{}, cfg.GetMaxWorkers())
 		wg := &sync.WaitGroup{}
+		wg.Add(maxWorkers)
 
-		for group := range groupsChan {
-			if group == nil {
-				continue
-			}
-
-			wg.Add(1)
-			go func(group *Group) {
+		for range maxWorkers {
+			go func() {
 				defer wg.Done()
 
-				select {
-				case <-ctx.Done():
-					return
-				case semaphore <- struct{}{}:
-				}
-
-				defer func() { <-semaphore }()
-
-				projectsChan, projErrsChan := fetchProjectByGroup(ctx, client, group)
-
-				for projectsChan != nil || projErrsChan != nil {
+				for {
 					select {
 					case <-ctx.Done():
 						return
-					case project, ok := <-projectsChan:
+					case group, ok := <-groupsChan:
 						if !ok {
-							projectsChan = nil
-							continue
-						}
-						if project == nil {
-							continue
-						}
-
-						select {
-						case dataChan <- project:
-						case <-ctx.Done():
 							return
 						}
-					case err, ok := <-projErrsChan:
-						if !ok {
-							projErrsChan = nil
+
+						if group == nil {
 							continue
 						}
 
-						if err != nil {
+						projectsChan, projErrsChan := fetchProjectByGroup(ctx, client, group)
+
+						for projectsChan != nil || projErrsChan != nil {
 							select {
-							case errsChan <- err:
 							case <-ctx.Done():
 								return
+							case project, ok := <-projectsChan:
+								if !ok {
+									projectsChan = nil
+									continue
+								}
+
+								select {
+								case dataChan <- project:
+								case <-ctx.Done():
+									return
+								}
+							case err, ok := <-projErrsChan:
+								if !ok {
+									projErrsChan = nil
+									continue
+								}
+
+								if err != nil {
+									select {
+									case errsChan <- err:
+									case <-ctx.Done():
+										return
+									}
+								}
 							}
 						}
 					}
 				}
-			}(group)
+			}()
 		}
 
 		wg.Wait()

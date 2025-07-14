@@ -54,6 +54,10 @@ func fetchProjectByGroup(ctx context.Context, client ProjectsService, group *Gro
 			}
 
 			for _, project := range projects {
+				if project == nil {
+					continue
+				}
+
 				prepare := &Project{
 					id:                project.ID,
 					path:              project.Path,
