@@ -33,6 +33,14 @@ func TestErrorGroupsFetching_Error(t *testing.T) {
 	}
 }
 
+func TestErrorProjectsFetching_Error(t *testing.T) {
+	err := &ErrorProjectsFetching{42, errors.New("fail")}
+	want := "failed to fetch projects for group 42: fail"
+	if err.Error() != want {
+		t.Errorf("got %q, want %q", err.Error(), want)
+	}
+}
+
 func TestErrorDirExists_Error(t *testing.T) {
 	err := ErrorDirExists("repo")
 	want := "directory already exists: repo"

@@ -13,19 +13,24 @@ import (
 )
 
 type FakeGitlabProjects struct {
+	nextPage int
 	projects map[int]map[int]*gitlab.Project
 	fetchErr error
 }
 
-func (f *FakeGitlabProjects) ListGroupProjects(gid int, _ *gitlab.ListGroupProjectsOptions, _ ...gitlab.RequestOptionFunc) ([]*gitlab.Project, *gitlab.Response, error) {
+func (f *FakeGitlabProjects) ListGroupProjects(gid int, opt *gitlab.ListGroupProjectsOptions, _ ...gitlab.RequestOptionFunc) ([]*gitlab.Project, *gitlab.Response, error) {
 	if f.fetchErr != nil {
 		return nil, nil, f.fetchErr
 	}
 
 	projects, exists := f.projects[gid]
 	if exists {
+		nextPage := f.nextPage
+		if opt.Page == nextPage {
+			nextPage = 0
+		}
 		return slices.Collect(maps.Values(projects)), &gitlab.Response{
-			NextPage: 0,
+			NextPage: nextPage,
 		}, nil
 	}
 
@@ -172,6 +177,100 @@ func TestFetchProjects(t *testing.T) {
 					if _, exists := received[id]; !exists {
 						t.Fatalf("expected project with id %d, but it was not received", id)
 					}
+				}
+
+				return dataChan, errsChan
+			},
+		},
+		{
+			name: "should work with pagination",
+			fn: func(t *testing.T) (<-chan *Project, <-chan error) {
+				projects := getFakeProjects()
+				dataChan, errsChan := fetchProjectByGroup(context.Background(), &FakeGitlabProjects{
+					projects: projects,
+					nextPage: 1,
+				}, &Group{id: 1})
+
+				received := map[int]int{}
+
+				dataDone := false
+				errsDone := false
+
+				for !dataDone || !errsDone {
+					select {
+					case project, ok := <-dataChan:
+						if !ok {
+							dataDone = true
+							continue
+						}
+						received[project.id]++
+					case err, ok := <-errsChan:
+						if !ok {
+							errsDone = true
+							continue
+						}
+						t.Fatalf("unexpected error: %v", err)
+					case <-time.After(50 * time.Millisecond):
+						t.Fatal("timeout waiting for channels to close")
+					}
+				}
+
+				if len(received) != len(projects[1]) {
+					t.Fatalf("expected %d projects, got %d", len(projects[1]), len(received))
+				}
+
+				for id := range projects[1] {
+					if _, exists := received[id]; !exists {
+						t.Fatalf("expected project with id %d, but it was not received", id)
+					}
+					if received[id] != 2 {
+						t.Fatalf("expected project with id %d to be received twice, got %d", id, received[id])
+					}
+				}
+
+				return dataChan, errsChan
+			},
+		},
+		{
+			name: "skip nil project",
+			fn: func(t *testing.T) (<-chan *Project, <-chan error) {
+				projects := getFakeProjects()
+				nilProjectId := 5
+				projects[1][nilProjectId] = nil // Simulate a nil project
+				dataChan, errsChan := fetchProjectByGroup(context.Background(), &FakeGitlabProjects{
+					projects: projects,
+				}, &Group{id: 1})
+
+				received := map[int]struct{}{}
+
+				dataDone := false
+				errsDone := false
+
+				for !dataDone || !errsDone {
+					select {
+					case project, ok := <-dataChan:
+						if !ok {
+							dataDone = true
+							continue
+						}
+						received[project.id] = struct{}{}
+					case err, ok := <-errsChan:
+						if !ok {
+							errsDone = true
+							continue
+						}
+						t.Fatalf("unexpected error: %v", err)
+					case <-time.After(50 * time.Millisecond):
+						t.Fatal("timeout waiting for channels to close")
+					}
+				}
+
+				if len(received) != (len(projects[1]) - 1) {
+					t.Fatalf("expected %d projects, got %d", len(projects[1]), len(received))
+				}
+
+				if _, exists := received[nilProjectId]; exists {
+					t.Fatalf("expected project with id %d to be skipped, but it was received", nilProjectId)
 				}
 
 				return dataChan, errsChan

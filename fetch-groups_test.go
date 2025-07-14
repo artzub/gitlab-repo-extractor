@@ -16,6 +16,7 @@ import (
 )
 
 type FakeGitlabGroups struct {
+	nextPage    int
 	groups      map[string]*gitlab.Group
 	sleep       time.Duration
 	fetchErr    error
@@ -69,8 +70,13 @@ func (f *FakeGitlabGroups) ListGroups(opt *gitlab.ListGroupsOptions, _ ...gitlab
 		filteredGroups = append(filteredGroups, group)
 	}
 
+	nextPage := f.nextPage
+	if opt.Page == nextPage {
+		nextPage = 0
+	}
+
 	return filteredGroups, &gitlab.Response{
-		NextPage: 0,
+		NextPage: nextPage,
 	}, nil
 }
 
@@ -468,6 +474,56 @@ func TestFetchAllGroups(t *testing.T) {
 				for _, aGroup := range gitlabGroups {
 					if _, exists := groups[aGroup.FullPath]; !exists {
 						t.Fatalf("expected group %s to be fetched, but it was not", aGroup.FullPath)
+					}
+				}
+
+				return dataChan, errsChan
+			},
+		},
+		{
+			name: "should work with pagination",
+			fn: func(t *testing.T) (<-chan *Group, <-chan error) {
+				cfg := config.NewConfig(config.NewMemoryEnvLoader(map[string]string{}))
+
+				gitlabGroups := getGitlabGroups()
+				client := NewFakeGitlab(gitlabGroups)
+				client.nextPage = 1 // simulate pagination
+
+				ctx := context.Background()
+				dataChan, errsChan := fetchAllGroups(ctx, client, cfg)
+
+				groups := map[string]int{}
+
+				dataDone := false
+				errsDone := false
+
+				for !dataDone || !errsDone {
+					select {
+					case group, ok := <-dataChan:
+						if !ok {
+							dataDone = true
+							continue
+						}
+						if group != nil {
+							groups[group.fullPath]++
+						}
+					case err, ok := <-errsChan:
+						if !ok {
+							errsDone = true
+							continue
+						}
+						t.Fatalf("unexpected error: %v", err)
+					case <-time.After(500 * time.Second):
+						t.Fatal("timeout waiting for group data")
+					}
+				}
+
+				for _, aGroup := range gitlabGroups {
+					if _, exists := groups[aGroup.FullPath]; !exists {
+						t.Fatalf("expected group %s to be fetched, but it was not", aGroup.FullPath)
+					}
+					if groups[aGroup.FullPath] != 2 {
+						t.Fatalf("expected group %s to be fetched twice, but it was fetched %d times", aGroup.FullPath, groups[aGroup.FullPath])
 					}
 				}
 

@@ -22,6 +22,7 @@ func proceedProjects(ctx context.Context, cloner Cloner, projectsChan <-chan *Pr
 		cfg := config.GetConfig()
 		maxWorkers := cfg.GetMaxWorkers()
 		outputDir := cfg.GetOutputDir()
+
 		outputDirOnce := &sync.Once{}
 		outputDirExists := atomic.Bool{}
 		outputDirNotifyOnce := &sync.Once{}
@@ -43,6 +44,10 @@ func proceedProjects(ctx context.Context, cloner Cloner, projectsChan <-chan *Pr
 							return
 						}
 
+						if project == nil {
+							continue
+						}
+
 						outputDirOnce.Do(func() {
 							exists, mkErr := cloner.GetOSWrapper().MakeDirAll(outputDir)
 							outputDirErr = mkErr
@@ -62,7 +67,7 @@ func proceedProjects(ctx context.Context, cloner Cloner, projectsChan <-chan *Pr
 							return
 						}
 
-						err := cloner.CloneProjectWithRetry(ctx, config.GetConfig(), project)
+						err := cloner.CloneProjectWithRetry(ctx, cfg, project)
 						select {
 						case <-ctx.Done():
 							return

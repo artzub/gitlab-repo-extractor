@@ -17,13 +17,14 @@ type mockOSWrapper struct {
 	cmdErr      error
 	removeErr   error
 	removedDir  string
+	mkdirErr    error
 }
 
-func (m *mockOSWrapper) IsDirExists(path string) (bool, error) {
+func (m *mockOSWrapper) IsDirExists(_ string) (bool, error) {
 	return m.isDirExists, m.isDirErr
 }
 
-func (m *mockOSWrapper) ExecuteCommand(ctx context.Context, name string, args ...string) ([]byte, error) {
+func (m *mockOSWrapper) ExecuteCommand(_ context.Context, name string, args ...string) ([]byte, error) {
 	m.cmdArgs = append([]string{name}, args...)
 	return m.cmdOutput, m.cmdErr
 }
@@ -33,8 +34,8 @@ func (m *mockOSWrapper) RemoveAll(path string) error {
 	return m.removeErr
 }
 
-func (m *mockOSWrapper) MakeDirAll(path string) (bool, error) {
-	return true, nil
+func (m *mockOSWrapper) MakeDirAll(_ string) (bool, error) {
+	return m.mkdirErr == nil, m.mkdirErr
 }
 
 func TestAddTokenToHTTPSURL(t *testing.T) {
