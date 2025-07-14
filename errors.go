@@ -33,6 +33,16 @@ func (e *ErrorGroupsFetching) Error() string {
 	return fmt.Sprintf("failed to fetch groups: %v", e.originalError)
 }
 
+// ErrorProjectsFetching is an error type that indicates a failure to fetch projects for a specific group.
+type ErrorProjectsFetching struct {
+	groupID       int
+	originalError error
+}
+
+func (e *ErrorProjectsFetching) Error() string {
+	return fmt.Sprintf("failed to fetch projects for group %d: %v", e.groupID, e.originalError)
+}
+
 // ErrorDirExists is an error type that indicates a directory already exists.
 type ErrorDirExists string
 

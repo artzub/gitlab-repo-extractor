@@ -15,26 +15,26 @@ import (
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
 
-type FakeGitlab struct {
+type FakeGitlabGroups struct {
 	groups      map[string]*gitlab.Group
 	sleep       time.Duration
 	fetchErr    error
 	fetchAllErr error
 }
 
-func NewFakeGitlab(groups map[string]*gitlab.Group, sleeps ...time.Duration) *FakeGitlab {
+func NewFakeGitlab(groups map[string]*gitlab.Group, sleeps ...time.Duration) *FakeGitlabGroups {
 	sleep := 0 * time.Second
 	if len(sleeps) > 0 {
 		sleep = sleeps[0]
 	}
 
-	return &FakeGitlab{
+	return &FakeGitlabGroups{
 		groups: groups,
 		sleep:  sleep,
 	}
 }
 
-func (f *FakeGitlab) GetGroup(gid string, _ *gitlab.GetGroupOptions, _ ...gitlab.RequestOptionFunc) (*gitlab.Group, *gitlab.Response, error) {
+func (f *FakeGitlabGroups) GetGroup(gid string, _ *gitlab.GetGroupOptions, _ ...gitlab.RequestOptionFunc) (*gitlab.Group, *gitlab.Response, error) {
 	if f.sleep > 0 {
 		time.Sleep(f.sleep)
 	}
@@ -49,7 +49,7 @@ func (f *FakeGitlab) GetGroup(gid string, _ *gitlab.GetGroupOptions, _ ...gitlab
 	return nil, nil, fmt.Errorf("group %s: not found %d", gid, 404)
 }
 
-func (f *FakeGitlab) ListGroups(opt *gitlab.ListGroupsOptions, _ ...gitlab.RequestOptionFunc) ([]*gitlab.Group, *gitlab.Response, error) {
+func (f *FakeGitlabGroups) ListGroups(opt *gitlab.ListGroupsOptions, _ ...gitlab.RequestOptionFunc) ([]*gitlab.Group, *gitlab.Response, error) {
 	if f.sleep > 0 {
 		time.Sleep(f.sleep)
 	}

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
@@ -49,7 +48,7 @@ func fetchProjectByGroup(ctx context.Context, client ProjectsService, group *Gro
 			if err != nil {
 				select {
 				case <-ctx.Done():
-				case errsChan <- fmt.Errorf("failed to fetch projects for group %v: %w", group.id, err):
+				case errsChan <- &ErrorProjectsFetching{group.id, err}:
 				}
 				return
 			}
