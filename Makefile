@@ -27,3 +27,7 @@ install:
 
 test: ## Run tests
 	go test ./... -race
+
+.PHONY: build
+build: setup ## Build the project
+	@go build .
