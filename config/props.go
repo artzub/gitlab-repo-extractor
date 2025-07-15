@@ -14,6 +14,9 @@ var (
 	UseSSHKey     = "RE_USE_SSH"
 	DefaultUseSSH = "false"
 
+	CloneBareKey     = "RE_CLONE_BARE"
+	DefaultCloneBare = "true"
+
 	GroupIDsKey     = "RE_GROUP_IDS"
 	SkipGroupIDsKey = "RE_SKIP_GROUP_IDS"
 

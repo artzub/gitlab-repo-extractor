@@ -19,6 +19,7 @@ func TestNewConfig(t *testing.T) {
 		maxWorkers:   10,
 		maxRetries:   5,
 		useSSH:       true,
+		cloneBare:    false,
 	}
 	expectations := map[string]string{
 		GitlabURLKey:    expectConfig.gitLabURL,
@@ -30,6 +31,7 @@ func TestNewConfig(t *testing.T) {
 		MaxWorkersKey:   strconv.Itoa(expectConfig.maxWorkers),
 		MaxRetriesKey:   strconv.Itoa(expectConfig.maxRetries),
 		UseSSHKey:       strconv.FormatBool(expectConfig.useSSH),
+		CloneBareKey:    strconv.FormatBool(expectConfig.cloneBare),
 	}
 
 	loader := NewMemoryEnvLoader(expectations)
@@ -64,6 +66,9 @@ func TestNewConfig(t *testing.T) {
 	if config.useSSH != expectConfig.useSSH {
 		t.Errorf("Expected useSSH %t, got %t", expectConfig.useSSH, config.useSSH)
 	}
+	if config.cloneBare != expectConfig.cloneBare {
+		t.Errorf("Expected cloneBare %t, got %t", expectConfig.cloneBare, config.cloneBare)
+	}
 
 	// Verify getters
 	if config.GetGitLabURL() != config.gitLabURL {
@@ -92,6 +97,9 @@ func TestNewConfig(t *testing.T) {
 	}
 	if config.GetUseSSH() != config.useSSH {
 		t.Errorf("Expected useSSH %t, got %t", config.useSSH, config.GetUseSSH())
+	}
+	if config.GetCloneBare() != config.cloneBare {
+		t.Errorf("Expected cloneBare %t, got %t", config.cloneBare, config.GetCloneBare())
 	}
 
 	beforeDefaultLoader := DefaultEnvLoader
@@ -126,6 +134,9 @@ func TestNewConfig(t *testing.T) {
 	}
 	if config.useSSH != expectConfig.useSSH {
 		t.Errorf("Expected useSSH %t, got %t", expectConfig.useSSH, config.useSSH)
+	}
+	if config.cloneBare != expectConfig.cloneBare {
+		t.Errorf("Expected cloneBare %t, got %t", expectConfig.cloneBare, config.cloneBare)
 	}
 }
 

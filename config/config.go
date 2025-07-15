@@ -19,6 +19,7 @@ type Config struct {
 	maxWorkers   int
 	maxRetries   int
 	useSSH       bool
+	cloneBare    bool
 }
 
 func extractGroupIDs(groupIDs string) []string {
@@ -47,6 +48,7 @@ func NewConfig(loaders ...EnvLoader) *Config {
 		accessToken:  loader.Get(GitlabTokenKey),
 		outputDir:    loader.Get(OutputDirKey, DefaultOutputDir),
 		useSSH:       loader.Get(UseSSHKey, DefaultUseSSH) == "true",
+		cloneBare:    loader.Get(CloneBareKey, DefaultCloneBare) == "true",
 		groupIDs:     extractGroupIDs(loader.Get(GroupIDsKey)),
 		skipGroupIDs: extractGroupIDs(loader.Get(SkipGroupIDsKey)),
 		maxWorkers:   loader.GetInt(MaxWorkersKey, DefaultMaxWorkers),
@@ -89,6 +91,10 @@ func (c *Config) GetMaxRetries() int {
 
 func (c *Config) GetUseSSH() bool {
 	return c.useSSH
+}
+
+func (c *Config) GetCloneBare() bool {
+	return c.cloneBare
 }
 
 // singleton instance of Config

@@ -112,7 +112,9 @@ func TestGitCloner_cloneProject(t *testing.T) {
 		sshURLToRepo:      "git://gitlab.com:repo.git",
 		pathWithNamespace: "repo",
 	}
-	emptyCfg := config.NewConfig(config.NewMemoryEnvLoader(map[string]string{}))
+	emptyCfg := config.NewConfig(config.NewMemoryEnvLoader(map[string]string{
+		config.CloneBareKey: "false",
+	}))
 
 	testCases := []struct {
 		name          string
@@ -185,6 +187,14 @@ func TestGitCloner_cloneProject(t *testing.T) {
 				config.UseSSHKey: "true",
 			})),
 		},
+		{
+			name:      "Clone project with bare clone",
+			project:   project,
+			osWrapper: &mockOSWrapper{},
+			cfg: config.NewConfig(config.NewMemoryEnvLoader(map[string]string{
+				config.CloneBareKey: "true",
+			})),
+		},
 	}
 
 	for _, testCase := range testCases {
@@ -227,12 +237,23 @@ func TestGitCloner_cloneProject(t *testing.T) {
 			if !testCase.cfg.GetUseSSH() {
 				expectedURL = addTokenToHTTPSURL(testCase.project.httpURLToRepo, testCase.cfg.GetAccessToken())
 			}
-			if testCase.osWrapper.cmdArgs[2] != expectedURL {
-				t.Errorf("expected URL %s, got: %s", expectedURL, testCase.osWrapper.cmdArgs[2])
+
+			cloneBare := testCase.cfg.GetCloneBare()
+			offset := 0
+			if cloneBare {
+				offset = 1
+
+				if testCase.osWrapper.cmdArgs[2] != "--bare" {
+					t.Errorf("expected '--bare' flag, got: %s", testCase.osWrapper.cmdArgs[2])
+				}
 			}
 
-			if testCase.osWrapper.cmdArgs[3] != testCase.project.pathWithNamespace {
-				t.Errorf("expected project path %s, got: %s", testCase.project.pathWithNamespace, testCase.osWrapper.cmdArgs[3])
+			if testCase.osWrapper.cmdArgs[offset+2] != expectedURL {
+				t.Errorf("expected URL %s, got: %s", expectedURL, testCase.osWrapper.cmdArgs[offset+2])
+			}
+
+			if testCase.osWrapper.cmdArgs[offset+3] != testCase.project.pathWithNamespace {
+				t.Errorf("expected project path %s, got: %s", testCase.project.pathWithNamespace, testCase.osWrapper.cmdArgs[offset+3])
 			}
 		})
 	}

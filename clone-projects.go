@@ -89,6 +89,7 @@ func (c *GitCloner) cloneProject(ctx context.Context, cfg *config.Config, projec
 
 	useSSH := cfg.GetUseSSH()
 	token := cfg.GetAccessToken()
+	cloneBare := cfg.GetCloneBare()
 
 	projectDir := project.pathWithNamespace
 
@@ -111,7 +112,13 @@ func (c *GitCloner) cloneProject(ctx context.Context, cfg *config.Config, projec
 		url = addTokenToHTTPSURL(cloneURL, token)
 	}
 
-	output, err := c.osWrapper.ExecuteCommand(ctx, "git", "clone", url, projectDir)
+	args := []string{"clone"}
+	if cloneBare {
+		args = append(args, "--bare")
+	}
+	args = append(args, url, projectDir)
+
+	output, err := c.osWrapper.ExecuteCommand(ctx, "git", args...)
 	if err != nil {
 		_ = c.osWrapper.RemoveAll(projectDir)
 		return &ErrorFailedToCloneProject{projectDir, err, output}
