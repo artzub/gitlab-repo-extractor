@@ -18,9 +18,9 @@ func shutdown() {
 }
 
 func TestMain(m *testing.M) {
+	defer shutdown()
 	setup()
 	code := m.Run()
-	shutdown()
 	os.Exit(code)
 }
 
@@ -41,20 +41,14 @@ func TestDefaultOSWrapper_MakeDirAll(t *testing.T) {
 
 	dir := path.Join(dirName, "test_make_dir_all")
 
-	exists, err := w.MakeDirAll(dir)
+	err := w.MakeDirAll(dir)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !exists {
-		t.Error("expected directory creation to succeed")
-	}
 
-	exists, err = w.MakeDirAll(dir)
+	err = w.MakeDirAll(dir)
 	if err != nil {
 		t.Fatalf("unexpected error on attempt to make existing dir: %v", err)
-	}
-	if !exists {
-		t.Error("expected directory to already exist")
 	}
 }
 
@@ -64,11 +58,11 @@ func TestDefaultOSWrapper_IsDirExists(t *testing.T) {
 	dir := path.Join(dirName, "test_exists")
 
 	exists, err := w.IsDirExists(dir)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
 	if exists {
-		t.Error("expected directory to not exist")
+		t.Fatal("expected directory to not exist")
+	}
+	if err != nil {
+		t.Fatalf("unexpected error, %v", err)
 	}
 
 	_ = os.MkdirAll(dir, 0o755)
@@ -77,7 +71,7 @@ func TestDefaultOSWrapper_IsDirExists(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !exists {
-		t.Error("expected directory to exist")
+		t.Fatal("expected directory to exist")
 	}
 
 	_ = os.RemoveAll(dir)

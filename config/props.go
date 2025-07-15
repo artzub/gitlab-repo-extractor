@@ -9,7 +9,7 @@ var (
 	DefaultGitlabURL = "https://gitlab.com"
 
 	OutputDirKey     = "RE_OUTPUT_DIR"
-	DefaultOutputDir = "./gitlab-repos"
+	DefaultOutputDir = ""
 
 	UseSSHKey     = "RE_USE_SSH"
 	DefaultUseSSH = "false"

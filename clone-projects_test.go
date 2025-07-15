@@ -34,8 +34,8 @@ func (m *mockOSWrapper) RemoveAll(path string) error {
 	return m.removeErr
 }
 
-func (m *mockOSWrapper) MakeDirAll(_ string) (bool, error) {
-	return m.mkdirErr == nil, m.mkdirErr
+func (m *mockOSWrapper) MakeDirAll(_ string) error {
+	return m.mkdirErr
 }
 
 func TestAddTokenToHTTPSURL(t *testing.T) {
@@ -177,6 +177,7 @@ func TestGitCloner_cloneProject(t *testing.T) {
 			osWrapper: &mockOSWrapper{},
 			cfg: config.NewConfig(config.NewMemoryEnvLoader(map[string]string{
 				config.GitlabTokenKey: "test-token",
+				config.OutputDirKey:   "test-output-dir",
 			})),
 		},
 		{
@@ -252,7 +253,12 @@ func TestGitCloner_cloneProject(t *testing.T) {
 				t.Errorf("expected URL %s, got: %s", expectedURL, testCase.osWrapper.cmdArgs[offset+2])
 			}
 
-			if testCase.osWrapper.cmdArgs[offset+3] != testCase.project.pathWithNamespace {
+			expectedPath := testCase.project.pathWithNamespace
+			if testCase.cfg.GetOutputDir() != "" {
+				expectedPath = testCase.cfg.GetOutputDir() + "/" + expectedPath
+			}
+
+			if testCase.osWrapper.cmdArgs[offset+3] != expectedPath {
 				t.Errorf("expected project path %s, got: %s", testCase.project.pathWithNamespace, testCase.osWrapper.cmdArgs[offset+3])
 			}
 		})
@@ -286,6 +292,20 @@ func TestGitCloner_CloneProjectWithRetry(t *testing.T) {
 			osWrapper:     &mockOSWrapper{},
 			cfg:           emptyCfg,
 			expectedError: ErrorNoProjectsPassed,
+		},
+		{
+			name:    "Failed if make dir error",
+			project: project,
+			osWrapper: &mockOSWrapper{
+				mkdirErr: errors.New("failed to create directory"),
+			},
+			cfg: config.NewConfig(config.NewMemoryEnvLoader(map[string]string{
+				config.OutputDirKey: "test-output-dir",
+			})),
+			expectedError: &ErrorOutputDirNotCreated{
+				"test-output-dir",
+				errors.New("failed to create directory"),
+			},
 		},
 		{
 			name:    "Failed after retries",
@@ -333,6 +353,13 @@ func TestGitCloner_CloneProjectWithRetry(t *testing.T) {
 			var afterRetiesErr *ErrorFailedAfterRetries
 			if errors.As(testCase.expectedError, &afterRetiesErr) &&
 				errors.As(err, &afterRetiesErr) &&
+				testCase.expectedError.Error() == err.Error() {
+				return
+			}
+
+			var outputDirErr *ErrorOutputDirNotCreated
+			if errors.As(testCase.expectedError, &outputDirErr) &&
+				errors.As(err, &outputDirErr) &&
 				testCase.expectedError.Error() == err.Error() {
 				return
 			}

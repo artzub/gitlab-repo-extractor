@@ -7,7 +7,7 @@ import (
 )
 
 type OSWrapper interface {
-	MakeDirAll(path string) (bool, error)
+	MakeDirAll(path string) error
 	IsDirExists(path string) (bool, error)
 	RemoveAll(path string) error
 	ExecuteCommand(ctx context.Context, cmd string, args ...string) ([]byte, error)
@@ -15,9 +15,8 @@ type OSWrapper interface {
 
 type DefaultOSWrapper struct{}
 
-func (w *DefaultOSWrapper) MakeDirAll(path string) (bool, error) {
-	err := os.MkdirAll(path, 0o755)
-	return err == nil, err
+func (w *DefaultOSWrapper) MakeDirAll(path string) error {
+	return os.MkdirAll(path, 0o755)
 }
 
 func (w *DefaultOSWrapper) IsDirExists(path string) (bool, error) {

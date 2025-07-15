@@ -48,10 +48,21 @@ func (c *GitCloner) CloneProjectWithRetry(ctx context.Context, cfg *config.Confi
 		return ErrorNoProjectsPassed
 	}
 
-	var lastErr error
-
 	maxRetries := cfg.GetMaxRetries()
 	retryDelay := cfg.GetRetryDelay()
+	outputDir := cfg.GetOutputDir()
+
+	if outputDir != "" {
+		err := c.GetOSWrapper().MakeDirAll(outputDir)
+		if err != nil {
+			return &ErrorOutputDirNotCreated{
+				outputDir,
+				err,
+			}
+		}
+	}
+
+	var lastErr error
 
 	for attempt := range maxRetries {
 		if attempt > 0 {
@@ -90,8 +101,12 @@ func (c *GitCloner) cloneProject(ctx context.Context, cfg *config.Config, projec
 	useSSH := cfg.GetUseSSH()
 	token := cfg.GetAccessToken()
 	cloneBare := cfg.GetCloneBare()
+	outputDir := cfg.GetOutputDir()
 
 	projectDir := project.pathWithNamespace
+	if outputDir != "" {
+		projectDir = outputDir + "/" + projectDir
+	}
 
 	ok, err := c.osWrapper.IsDirExists(projectDir)
 	if ok || err != nil {
@@ -121,7 +136,7 @@ func (c *GitCloner) cloneProject(ctx context.Context, cfg *config.Config, projec
 	output, err := c.osWrapper.ExecuteCommand(ctx, "git", args...)
 	if err != nil {
 		_ = c.osWrapper.RemoveAll(projectDir)
-		return &ErrorFailedToCloneProject{projectDir, err, output}
+		return &ErrorFailedToCloneProject{project.pathWithNamespace, err, output}
 	}
 
 	return nil

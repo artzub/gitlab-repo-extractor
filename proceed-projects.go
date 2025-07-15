@@ -49,9 +49,9 @@ func proceedProjects(ctx context.Context, cloner Cloner, projectsChan <-chan *Pr
 						}
 
 						outputDirOnce.Do(func() {
-							exists, mkErr := cloner.GetOSWrapper().MakeDirAll(outputDir)
+							mkErr := cloner.GetOSWrapper().MakeDirAll(outputDir)
 							outputDirErr = mkErr
-							outputDirExists.Store(exists)
+							outputDirExists.Store(mkErr == nil)
 						})
 
 						if !outputDirExists.Load() {
