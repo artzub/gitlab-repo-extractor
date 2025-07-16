@@ -26,6 +26,7 @@ install:
 	@go install golang.org/x/tools/cmd/goimports@latest
 
 test: ## Run tests
+	go vet ./...
 	go test ./... -race
 
 .PHONY: build
