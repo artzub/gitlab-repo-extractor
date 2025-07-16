@@ -21,7 +21,17 @@ func (e *ErrorGroupFetching) IsGroupNotFound() bool {
 		return true
 	}
 
-	return e.originalError != nil && strings.Contains(e.originalError.Error(), "not found")
+	return e.originalError != nil && strings.Contains(strings.ToLower(e.originalError.Error()), "not found")
+}
+
+// ErrorSubGroupsFetching is an error type that indicates a failure to fetch all subgroups.
+type ErrorSubGroupsFetching struct {
+	groupID       string
+	originalError error
+}
+
+func (e *ErrorSubGroupsFetching) Error() string {
+	return fmt.Sprintf("failed to fetch subgroups of group %s: %v", e.groupID, e.originalError)
 }
 
 // ErrorGroupsFetching is an error type that indicates a failure to fetch all groups.

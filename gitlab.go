@@ -5,6 +5,7 @@ import gitlab "gitlab.com/gitlab-org/api/client-go"
 type GroupsService interface {
 	GetGroup(gid string, opt *gitlab.GetGroupOptions, options ...gitlab.RequestOptionFunc) (*gitlab.Group, *gitlab.Response, error)
 	ListGroups(opt *gitlab.ListGroupsOptions, options ...gitlab.RequestOptionFunc) ([]*gitlab.Group, *gitlab.Response, error)
+	ListSubGroups(gid string, opt *gitlab.ListSubGroupsOptions, options ...gitlab.RequestOptionFunc) ([]*gitlab.Group, *gitlab.Response, error)
 }
 
 type ProjectsService interface {
@@ -27,6 +28,10 @@ func (g *Gitlab) GetGroup(gid string, opt *gitlab.GetGroupOptions, options ...gi
 
 func (g *Gitlab) ListGroups(opt *gitlab.ListGroupsOptions, options ...gitlab.RequestOptionFunc) ([]*gitlab.Group, *gitlab.Response, error) {
 	return g.client.Groups.ListGroups(opt, options...)
+}
+
+func (g *Gitlab) ListSubGroups(gid string, opt *gitlab.ListSubGroupsOptions, options ...gitlab.RequestOptionFunc) ([]*gitlab.Group, *gitlab.Response, error) {
+	return g.client.Groups.ListSubGroups(gid, opt, options...)
 }
 
 func (g *Gitlab) ListGroupProjects(gid int, opt *gitlab.ListGroupProjectsOptions, options ...gitlab.RequestOptionFunc) ([]*gitlab.Project, *gitlab.Response, error) {

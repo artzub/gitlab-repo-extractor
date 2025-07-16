@@ -33,7 +33,7 @@ func fetchProjectByGroup(ctx context.Context, client ProjectsService, group *Gro
 			return
 		}
 
-		subGroups := true
+		subGroups := false
 		withShared := false
 		simple := true
 		opt := &gitlab.ListGroupProjectsOptions{

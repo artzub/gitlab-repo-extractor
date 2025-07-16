@@ -7,6 +7,7 @@ import (
 	"iter"
 	"maps"
 	"slices"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -18,9 +19,11 @@ import (
 type FakeGitlabGroups struct {
 	nextPage    int
 	groups      map[string]*gitlab.Group
+	subGroups   map[string][]*gitlab.Group
 	sleep       time.Duration
 	fetchErr    error
 	fetchAllErr error
+	fetchSubErr error
 }
 
 func NewFakeGitlab(groups map[string]*gitlab.Group, sleeps ...time.Duration) *FakeGitlabGroups {
@@ -80,6 +83,43 @@ func (f *FakeGitlabGroups) ListGroups(opt *gitlab.ListGroupsOptions, _ ...gitlab
 	}, nil
 }
 
+func (f *FakeGitlabGroups) ListSubGroups(gid string, opt *gitlab.ListSubGroupsOptions, _ ...gitlab.RequestOptionFunc) ([]*gitlab.Group, *gitlab.Response, error) {
+	if f.sleep > 0 {
+		time.Sleep(f.sleep)
+	}
+
+	if f.fetchSubErr != nil {
+		return nil, nil, f.fetchSubErr
+	}
+
+	skipGroupIDs := opt.SkipGroups
+
+	var filteredGroups []*gitlab.Group
+
+	groups, ok := f.subGroups[gid]
+	if !ok {
+		return filteredGroups, &gitlab.Response{
+			NextPage: 0,
+		}, nil
+	}
+
+	for _, group := range groups {
+		if skipGroupIDs != nil && group != nil && slices.Contains(*skipGroupIDs, group.ID) {
+			continue
+		}
+		filteredGroups = append(filteredGroups, group)
+	}
+
+	nextPage := f.nextPage
+	if opt.Page == nextPage {
+		nextPage = 0
+	}
+
+	return filteredGroups, &gitlab.Response{
+		NextPage: nextPage,
+	}, nil
+}
+
 func getGitlabGroups(shouldBeNil ...int) map[string]*gitlab.Group {
 	gitlabGroups := map[string]*gitlab.Group{}
 	hasShouldBeNil := len(shouldBeNil) > 0
@@ -95,7 +135,34 @@ func getGitlabGroups(shouldBeNil ...int) map[string]*gitlab.Group {
 			FullPath: key,
 		}
 	}
+
 	return gitlabGroups
+}
+
+func getGitlabSubGroups(gitlabGroups map[string]*gitlab.Group, shouldBeNil ...bool) map[string][]*gitlab.Group {
+	subGroups := map[string][]*gitlab.Group{}
+	mustBeNil := len(shouldBeNil) > 0 && shouldBeNil[0]
+	for _, group := range gitlabGroups {
+		if group == nil {
+			continue
+		}
+		subGroupKey := strconv.Itoa(group.ID)
+		subGroups[subGroupKey] = []*gitlab.Group{
+			{
+				ID:       group.ID*100 + 1,
+				FullPath: fmt.Sprintf("%s/subgroup1", group.FullPath),
+			},
+			{
+				ID:       group.ID*100 + 2,
+				FullPath: fmt.Sprintf("%s/subgroup2", group.FullPath),
+			},
+		}
+		if mustBeNil {
+			subGroups[subGroupKey][0] = nil
+		}
+	}
+
+	return subGroups
 }
 
 func TestFilterGroups(t *testing.T) {
@@ -208,6 +275,149 @@ func TestFetchGroupByID(t *testing.T) {
 	}
 }
 
+func TestFetchSkippedGroupIDs(t *testing.T) {
+	gitlabGroups := getGitlabGroups()
+
+	tests := []struct {
+		name        string
+		groupIDs    []string
+		groups      map[string]*gitlab.Group
+		expected    []int
+		throwErr    error
+		expectedErr error
+	}{
+		{
+			name:     "should fetch skipped group IDs",
+			groupIDs: []string{"example_group1", "example_group2", "example_group3"},
+			groups:   gitlabGroups,
+			expected: []int{1, 2, 3},
+		},
+		{
+			name:     "should return skip nil groups",
+			groupIDs: []string{"example_group1", "example_group2", "example_group3"},
+			groups:   getGitlabGroups(1),
+			expected: []int{2, 3},
+		},
+		{
+			name:     "should not throw error if not found",
+			groupIDs: []string{"example_group1", "non_existent_group"},
+			groups:   gitlabGroups,
+			expected: []int{1},
+		},
+		{
+			name:        "should return error if fetching error",
+			groupIDs:    []string{"example_group1"},
+			groups:      gitlabGroups,
+			throwErr:    errors.New("fetching error"),
+			expectedErr: &ErrorGroupFetching{"example_group1", errors.New("fetching error")},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			client := NewFakeGitlab(test.groups)
+			if test.throwErr != nil {
+				client.fetchErr = test.throwErr
+			}
+
+			ctx := context.Background()
+			skippedGroups, err := fetchSkippedGroupIDs(ctx, client, test.groupIDs)
+			if err != nil {
+				var fetchErr *ErrorGroupFetching
+				if errors.As(err, &fetchErr) && err.Error() == test.expectedErr.Error() {
+					return
+				}
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if !slices.Equal(skippedGroups, test.expected) {
+				t.Errorf("expected skipped groups %v, got %v", test.expected, skippedGroups)
+			}
+		})
+	}
+}
+
+func TestFetchSubGroups(t *testing.T) {
+	tests := []struct {
+		name        string
+		groupID     string
+		subGroups   map[string][]*gitlab.Group
+		expected    []int
+		nextPage    int
+		fetchSubErr error
+		expectedErr error
+	}{
+		{
+			name:      "should fetch subgroups",
+			groupID:   "1",
+			subGroups: getGitlabSubGroups(getGitlabGroups()),
+			expected: []int{
+				101,
+				102,
+			},
+		},
+		{
+			name:        "should return error if fetching subgroups fails",
+			groupID:     "1",
+			fetchSubErr: errors.New("fetching error"),
+			expectedErr: &ErrorSubGroupsFetching{"1", errors.New("fetching error")},
+		},
+		{
+			name:      "should return empty if no subgroups",
+			groupID:   "not_existing_group",
+			subGroups: getGitlabSubGroups(getGitlabGroups()),
+			expected:  []int{},
+		},
+		{
+			name:      "should skip a subgroup if it is nil",
+			groupID:   "1",
+			subGroups: getGitlabSubGroups(getGitlabGroups(), true),
+			expected:  []int{102},
+		},
+		{
+			name:      "should handle pagination",
+			groupID:   "1",
+			subGroups: getGitlabSubGroups(getGitlabGroups()),
+			expected:  []int{101, 102, 101, 102}, // simulate two pages
+			nextPage:  1,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			client := NewFakeGitlab(map[string]*gitlab.Group{})
+			if test.fetchSubErr != nil {
+				client.fetchSubErr = test.fetchSubErr
+			}
+			client.nextPage = test.nextPage
+			client.subGroups = test.subGroups
+
+			ctx := context.Background()
+			subGroups, err := fetchSubGroups(ctx, client, test.groupID, nil)
+			if err != nil {
+				var fetchErr *ErrorSubGroupsFetching
+				if errors.As(err, &fetchErr) && err.Error() == test.expectedErr.Error() {
+					return
+				}
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			receivedIDs := make([]int, len(subGroups))
+			for i, subGroup := range subGroups {
+				if subGroup == nil {
+					t.Errorf("expected non-nil subgroup, got nil")
+					continue
+				}
+				receivedIDs[i] = subGroup.id
+			}
+
+			if !slices.Equal(receivedIDs, test.expected) {
+				t.Errorf("expected subgroup IDs %v, got %v", test.expected, receivedIDs)
+			}
+		})
+	}
+}
+
 func TestFetchGroupsByIDs(t *testing.T) {
 	tests := []struct {
 		name string
@@ -251,6 +461,67 @@ func TestFetchGroupsByIDs(t *testing.T) {
 					if _, exists := groups[groupID]; !exists {
 						t.Fatalf("expected group %s to be fetched, but it was not", groupID)
 					}
+				}
+
+				return dataChan, errsChan
+			},
+		},
+		{
+			name: "should fetch groups by IDs and fetch all their subgroups",
+			fn: func(t *testing.T) (<-chan *Group, <-chan error) {
+				cfg := config.NewConfig(config.NewMemoryEnvLoader(map[string]string{
+					config.GroupIDsKey: "example_group1",
+				}))
+
+				gitlabGroups := getGitlabGroups()
+				gitlabSubGroups := getGitlabSubGroups(gitlabGroups)
+				client := NewFakeGitlab(gitlabGroups)
+				client.subGroups = gitlabSubGroups
+
+				groupIDs := cfg.GetGroupIDs()
+
+				var expectedGroupID []string
+				for _, groupID := range groupIDs {
+					group := gitlabGroups[groupID]
+					groupID = strconv.Itoa(group.ID)
+					expectedGroupID = append(expectedGroupID, groupID)
+					for _, subGroup := range gitlabSubGroups[groupID] {
+						expectedGroupID = append(expectedGroupID, strconv.Itoa(subGroup.ID))
+					}
+				}
+
+				ctx := context.Background()
+				dataChan, errsChan := fetchGroupsByIDs(ctx, client, cfg)
+
+				dataDone := false
+				errsDone := false
+
+				var groups []string
+
+				// expect to receive only the groups that are not skipped
+				for !dataDone || !errsDone {
+					select {
+					case group, ok := <-dataChan:
+						if !ok {
+							dataDone = true
+							continue
+						}
+						if group != nil {
+							groups = append(groups, strconv.Itoa(group.id))
+						}
+					case err, ok := <-errsChan:
+						if !ok {
+							errsDone = true
+							continue
+						}
+						t.Fatalf("unexpected error: %v", err)
+					case <-time.After(time.Second):
+						t.Fatal("timeout waiting for group data")
+					}
+				}
+
+				if !slices.Equal(groups, expectedGroupID) {
+					t.Fatalf("expected groups %v, got %v", expectedGroupID, groups)
 				}
 
 				return dataChan, errsChan
@@ -405,6 +676,57 @@ func TestFetchGroupsByIDs(t *testing.T) {
 					t.Fatal("expected no data to be sent")
 				case <-time.After(time.Second):
 					t.Fatal("timeout waiting for error")
+				}
+
+				return dataChan, errsChan
+			},
+		},
+		{
+			name: "should error if fetching subgroups fails",
+			fn: func(t *testing.T) (<-chan *Group, <-chan error) {
+				cfg := config.NewConfig(config.NewMemoryEnvLoader(map[string]string{
+					config.GroupIDsKey: "example_group1",
+				}))
+
+				gitlabGroups := getGitlabGroups()
+				client := NewFakeGitlab(gitlabGroups)
+				client.fetchSubErr = errors.New("fetching error for subgroups")
+
+				expectedErr := &ErrorSubGroupsFetching{
+					strconv.Itoa(gitlabGroups["example_group1"].ID),
+					client.fetchSubErr,
+				}
+
+				ctx := context.Background()
+				dataChan, errsChan := fetchGroupsByIDs(ctx, client, cfg)
+
+				dataDone := false
+				errsDone := false
+
+				onlyOneGroup := 0
+
+				for !dataDone || !errsDone {
+					select {
+					case err, ok := <-errsChan:
+						if !ok {
+							errsDone = true
+							continue
+						}
+						if err == nil || expectedErr.Error() != err.Error() {
+							t.Fatalf("expected error '%v', got %v", expectedErr, err)
+						}
+					case _, ok := <-dataChan:
+						if !ok {
+							dataDone = true
+							continue
+						}
+						onlyOneGroup++
+						if onlyOneGroup > 1 {
+							t.Fatal("expected no data to be sent")
+						}
+					case <-time.After(time.Second):
+						t.Fatal("timeout waiting for error")
+					}
 				}
 
 				return dataChan, errsChan

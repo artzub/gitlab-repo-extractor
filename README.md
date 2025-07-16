@@ -44,7 +44,7 @@ List of available environment variables:
 | **RE_CLONE_BARE**          | Use bare cloning (no working directory)                                                     | true               | `RE_CLONE_BARE=true`                        |
 
 ### Group IDs
-Group ID can be the integer ID of group or a path to the group. [URL-encoded path of the group](https://docs.gitlab.com/api/rest/#namespaced-paths).    
+Group ID can be the integer ID of group or a path to the group [URL-encoded path of the group](https://docs.gitlab.com/api/rest/#namespaced-paths).    
 `<gitlab-server-url>/<group-path>/<project-path>`  
 `<group-path>` - `<group-name>/<sub-group-name>`  
 For example: `gitlab-org/api` - group with path `https://gitlab.org/gitlab-org/api`

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"strconv"
 	"sync"
 
 	"github.com/artzub/gitlab-repo-extractor/config"
@@ -32,25 +33,14 @@ func fetchAllGroups(ctx context.Context, client GroupsService, cfg *config.Confi
 			close(errsChan)
 		}()
 
-		var skipGroups []int
-
-		if len(cfg.GetSkipGroupIDs()) > 0 {
-			for _, skipGroupID := range cfg.GetSkipGroupIDs() {
-				var fetchErr *ErrorGroupFetching
-				group, err := fetchGroupByID(ctx, client, skipGroupID)
-				isNotFound := errors.As(err, &fetchErr) && fetchErr.IsGroupNotFound()
-				if err != nil && !isNotFound {
-					select {
-					case <-ctx.Done():
-					case errsChan <- err:
-					}
-					return
-				}
-
-				if !isNotFound {
-					skipGroups = append(skipGroups, group.id)
-				}
+		skipGroupIDs := cfg.GetSkipGroupIDs()
+		skipGroups, err := fetchSkippedGroupIDs(ctx, client, skipGroupIDs)
+		if err != nil {
+			select {
+			case <-ctx.Done():
+			case errsChan <- err:
 			}
+			return
 		}
 
 		topLevelOnly := false
@@ -121,16 +111,26 @@ func fetchGroupsByIDs(ctx context.Context, client GroupsService, cfg *config.Con
 		}()
 
 		groupIDs := cfg.GetGroupIDs()
+		skipGroupIDs := cfg.GetSkipGroupIDs()
 
 		if len(groupIDs) == 0 {
 			errsChan <- ErrorNoGroupIDs
 			return
 		}
 
-		filteredGroupIDs := filterGroupIDs(groupIDs, cfg.GetSkipGroupIDs())
+		filteredGroupIDs := filterGroupIDs(groupIDs, skipGroupIDs)
 
 		if len(filteredGroupIDs) == 0 {
 			errsChan <- ErrorAllGroupIDsSkipped
+			return
+		}
+
+		skipGroups, err := fetchSkippedGroupIDs(ctx, client, skipGroupIDs)
+		if err != nil {
+			select {
+			case <-ctx.Done():
+			case errsChan <- err:
+			}
 			return
 		}
 
@@ -163,6 +163,31 @@ func fetchGroupsByIDs(ctx context.Context, client GroupsService, cfg *config.Con
 				case <-ctx.Done():
 				case dataChan <- group:
 				}
+
+				order := []string{strconv.Itoa(group.id)}
+				for len(order) > 0 {
+					anGroupID := order[0]
+					order = order[1:]
+
+					groups, err := fetchSubGroups(ctx, client, anGroupID, skipGroups)
+					if err != nil {
+						select {
+						case <-ctx.Done():
+						case errsChan <- err:
+						}
+						return
+					}
+
+					for _, subGroup := range groups {
+						order = append(order, strconv.Itoa(subGroup.id))
+
+						select {
+						case <-ctx.Done():
+							return
+						case dataChan <- subGroup:
+						}
+					}
+				}
 			}(groupID)
 		}
 
@@ -170,6 +195,66 @@ func fetchGroupsByIDs(ctx context.Context, client GroupsService, cfg *config.Con
 	}()
 
 	return dataChan, errsChan
+}
+
+func fetchSkippedGroupIDs(ctx context.Context, client GroupsService, groupIDs []string) ([]int, error) {
+	if len(groupIDs) == 0 {
+		return []int{}, nil
+	}
+
+	var fetchErr *ErrorGroupFetching
+
+	skipGroups := make([]int, 0, len(groupIDs))
+	for _, groupID := range groupIDs {
+		group, err := fetchGroupByID(ctx, client, groupID)
+
+		isNotFound := errors.As(err, &fetchErr) && fetchErr.IsGroupNotFound()
+		if err != nil && !isNotFound {
+			return nil, err
+		}
+
+		if group != nil {
+			skipGroups = append(skipGroups, group.id)
+		}
+	}
+
+	return skipGroups, nil
+}
+
+func fetchSubGroups(ctx context.Context, client GroupsService, groupId string, skipGroups []int) ([]*Group, error) {
+	allAvailable := true
+	opt := &gitlab.ListSubGroupsOptions{
+		AllAvailable: &allAvailable,
+		SkipGroups:   &skipGroups,
+	}
+	opt.PerPage = 100
+
+	var result []*Group
+
+	for {
+		groups, resp, err := client.ListSubGroups(groupId, opt, gitlab.WithContext(ctx))
+		if err != nil {
+			return nil, &ErrorSubGroupsFetching{groupId, err}
+		}
+
+		for _, subGroup := range groups {
+			if subGroup == nil {
+				continue
+			}
+
+			result = append(result, &Group{
+				id:       subGroup.ID,
+				fullPath: subGroup.FullPath,
+			})
+		}
+
+		if resp.NextPage == 0 {
+			break
+		}
+		opt.Page = resp.NextPage
+	}
+
+	return result, nil
 }
 
 func fetchGroupByID(ctx context.Context, client GroupsService, groupID string) (*Group, error) {
