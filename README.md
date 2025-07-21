@@ -35,7 +35,7 @@ List of available environment variables:
 | **RE_GITLAB_URL**          | GitLab Server URL                                                                           | https://gitlab.com | `RE_GITLAB_URL=https://gitlab.com`          |
 | **RE_GITLAB_TOKEN**        | GitLab API access token                                                                     |                    | `RE_GITLAB_TOKEN=xxxx`                      |
 | **RE_OUTPUT_DIR**          | Output directory                                                                            | ./gitlab-repos     | `RE_OUTPUT_DIR=./gitlab-repos`              |
-| **RE_MAX_WORKERS**         | Number of workers                                                                           | 5                  | `RE_MAX_WORKERS=5`                          |
+| **RE_MAX_WORKERS**         | Number of workers                                                                           | `runtime.NumCPU()` | `RE_MAX_WORKERS=5`                          |
 | **RE_MAX_RETRIES**         | Retry attempts for failed clones                                                            | 3                  | `RE_MAX_RETRIES=3`                          |
 | **RE_RETRY_DELAY_SECONDS** | Delay between retries in seconds                                                            | 2                  | `RE_RETRY_DELAY_SECONDS=2`                  |
 | **RE_GROUP_IDS**           | Clone specific groups only, split by comma or space.<br/>[More about group ids](#group-ids) |                    | `RE_GROUP_IDS="gitlab-org, gitlab-org/api"` |
