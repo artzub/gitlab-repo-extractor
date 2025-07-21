@@ -40,3 +40,50 @@ func mergeChans[T any](ctx context.Context, chans ...<-chan T) <-chan T {
 
 	return out
 }
+
+func teeChan[T any](ctx context.Context, in <-chan T, amountChans int) []chan T {
+	chans := make([]chan T, amountChans)
+
+	for index := range amountChans {
+		chans[index] = make(chan T)
+	}
+
+	go func() {
+		defer func() {
+			for _, ch := range chans {
+				close(ch)
+			}
+		}()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case item, ok := <-in:
+				if !ok {
+					return
+				}
+
+				wg := &sync.WaitGroup{}
+
+				for _, ch := range chans {
+					wg.Add(1)
+
+					go func() {
+						defer wg.Done()
+
+						select {
+						case ch <- item:
+						case <-ctx.Done():
+							return
+						}
+					}()
+				}
+
+				wg.Wait()
+			}
+		}
+	}()
+
+	return chans
+}

@@ -58,3 +58,57 @@ func TestMergeChans_ContextCancel(t *testing.T) {
 		t.Errorf("expected no values to be read, got %d", read)
 	}
 }
+
+func TestTeeChan_AllChannelsReceiveItems(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	in := make(chan int)
+	amountChans := 3
+	chans := teeChan(ctx, in, amountChans)
+
+	amountData := 5
+
+	go func() {
+		defer close(in)
+
+		for item := range amountData {
+			in <- item
+		}
+	}()
+
+	for item := range amountData {
+		for _, ch := range chans {
+			val, ok := <-ch
+			if !ok {
+				t.Fatalf("Channel closed unexpectedly")
+			}
+			if val != item {
+				t.Errorf("Expected %d, got %d", item, val)
+			}
+		}
+	}
+
+	// After input is closed, all output channels should be closed
+	for _, ch := range chans {
+		_, ok := <-ch
+		if ok {
+			t.Errorf("Expected channel to be closed")
+		}
+	}
+}
+
+func TestTeeChan_ContextCancelClosesChannels(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	in := make(chan int)
+	chans := teeChan(ctx, in, 2)
+
+	cancel() // cancel context immediately
+
+	for _, ch := range chans {
+		_, ok := <-ch
+		if ok {
+			t.Errorf("Expected channel to be closed after context cancel")
+		}
+	}
+}
