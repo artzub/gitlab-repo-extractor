@@ -32,19 +32,35 @@ func run() error {
 	gitlabClient := NewGitlab(client)
 
 	groupsChan, groupErrsChan := fetchGroups(ctx, gitlabClient, cfg)
-	projectsChan, projectErrsChan := proceedGroups(ctx, gitlabClient, groupsChan)
-	resultsChan := proceedProjects(ctx, NewGitCloner(), projectsChan)
+	groupsChans := teeChan(ctx, groupsChan, 2)
+
+	projectsChan, projectErrsChan := proceedGroups(ctx, gitlabClient, groupsChans[0])
+	projectsChans := teeChan(ctx, projectsChan, 2)
+
+	jobsChan := proceedProjects(ctx, NewGitCloner(), projectsChans[0])
 
 	errGroup := mergeChans(ctx, groupErrsChan, projectErrsChan)
 
 	counter := NewProgressCounter(0)
 	errorsCounter := NewProgressCounter(0)
 
-	for resultsChan != nil || errGroup != nil {
+	go func() {
+		for group := range groupsChans[1] {
+			log.Printf("Fetching projects of group: %s\n", group.fullPath)
+		}
+	}()
+
+	go func() {
+		for project := range projectsChans[1] {
+			log.Printf("Cloning project: %s\n", project.pathWithNamespace)
+		}
+	}()
+
+	for jobsChan != nil || errGroup != nil {
 		select {
-		case result, ok := <-resultsChan:
+		case result, ok := <-jobsChan:
 			if !ok {
-				resultsChan = nil
+				jobsChan = nil
 				continue
 			}
 			if result == nil {
@@ -53,9 +69,15 @@ func run() error {
 
 			if result.err != nil {
 				counter.Update(false)
-				log.Printf("Error processing project: %v\n", result.err)
+				projectPath := "unknown"
+				if result.project != nil {
+					projectPath = result.project.pathWithNamespace
+				}
+				log.Printf("Error cloning project: %s, %v\n", projectPath, result.err)
 				continue
 			}
+
+			log.Printf("Successfully cloned project: %s\n", result.project.pathWithNamespace)
 
 			counter.Update(true)
 		case err, ok := <-errGroup:
